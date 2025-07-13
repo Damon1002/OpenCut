@@ -3,9 +3,10 @@
 import { motion } from "motion/react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Play } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import Link from "next/link";
 
 import Image from "next/image";
 import { Handlebars } from "./handlebars";
@@ -140,12 +141,31 @@ export function Hero({ signupCount }: HeroProps) {
           </form>
         </motion.div>
 
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8, duration: 0.6 }}
+          className="mt-8 flex flex-col items-center gap-4"
+        >
+          <div className="flex items-center gap-3">
+            <div className="h-px bg-border flex-1" />
+            <span className="text-sm text-muted-foreground">or</span>
+            <div className="h-px bg-border flex-1" />
+          </div>
+          <Link href="/projects">
+            <Button variant="outline" size="lg" className="px-6 h-11 text-base">
+              <Play className="h-4 w-4 mr-2" />
+              Try Video Editor
+            </Button>
+          </Link>
+        </motion.div>
+
         {signupCount > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 0.6 }}
-            className="mt-8 inline-flex items-center gap-2 text-sm text-muted-foreground justify-center"
+            transition={{ delay: 1.0, duration: 0.6 }}
+            className="mt-6 inline-flex items-center gap-2 text-sm text-muted-foreground justify-center"
           >
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             <span>{signupCount.toLocaleString()} people already joined</span>

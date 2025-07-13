@@ -626,8 +626,8 @@ export function TimelineTrackContent({
           let targetTrack = track;
 
           // Handle position-aware track creation for text
-          if (track.type !== "text" || dropPosition !== "on") {
-            // Text tracks should go above the main track
+          if ((track.type !== "text" && track.type !== "media") || dropPosition !== "on") {
+            // Text elements can go on text or media tracks
             const mainTrack = getMainTrack(tracks);
             let insertIndex: number;
 
@@ -636,26 +636,43 @@ export function TimelineTrackContent({
             } else if (dropPosition === "below") {
               insertIndex = currentTrackIndex + 1;
             } else {
-              // dropPosition === "on" but track is not text type
-              // Insert above main track if main track exists, otherwise at top
-              if (mainTrack) {
-                const mainTrackIndex = tracks.findIndex(
-                  (t) => t.id === mainTrack.id
-                );
-                insertIndex = mainTrackIndex;
+              // dropPosition === "on" but track is not text or media type
+              // Try to use main track if it exists and is compatible
+              if (mainTrack && (mainTrack.type === "text" || mainTrack.type === "media")) {
+                targetTrackId = mainTrack.id;
+                targetTrack = mainTrack;
               } else {
-                insertIndex = 0; // Top of timeline
+                // Create new text track above main track if main track exists, otherwise at top
+                if (mainTrack) {
+                  const mainTrackIndex = tracks.findIndex(
+                    (t) => t.id === mainTrack.id
+                  );
+                  insertIndex = mainTrackIndex;
+                } else {
+                  insertIndex = 0; // Top of timeline
+                }
+                targetTrackId = insertTrackAt("text", insertIndex);
+                // Get the updated tracks array after creating the new track
+                const updatedTracks = useTimelineStore.getState().tracks;
+                const newTargetTrack = updatedTracks.find(
+                  (t) => t.id === targetTrackId
+                );
+                if (!newTargetTrack) return;
+                targetTrack = newTargetTrack;
               }
             }
 
-            targetTrackId = insertTrackAt("text", insertIndex);
-            // Get the updated tracks array after creating the new track
-            const updatedTracks = useTimelineStore.getState().tracks;
-            const newTargetTrack = updatedTracks.find(
-              (t) => t.id === targetTrackId
-            );
-            if (!newTargetTrack) return;
-            targetTrack = newTargetTrack;
+            // Only create new track if we need to insert at a specific position
+            if (dropPosition !== "on") {
+              targetTrackId = insertTrackAt("text", insertIndex);
+              // Get the updated tracks array after creating the new track
+              const updatedTracks = useTimelineStore.getState().tracks;
+              const newTargetTrack = updatedTracks.find(
+                (t) => t.id === targetTrackId
+              );
+              if (!newTargetTrack) return;
+              targetTrack = newTargetTrack;
+            }
           }
 
           // Check for overlaps with existing elements in target track

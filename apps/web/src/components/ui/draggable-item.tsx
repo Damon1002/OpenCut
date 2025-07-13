@@ -17,6 +17,7 @@ export interface DraggableMediaItemProps {
   showPlusOnDrag?: boolean;
   showLabel?: boolean;
   rounded?: boolean;
+  onPlusClick?: () => void;
 }
 
 export function DraggableMediaItem({
@@ -29,6 +30,7 @@ export function DraggableMediaItem({
   showPlusOnDrag = true,
   showLabel = true,
   rounded = true,
+  onPlusClick,
 }: DraggableMediaItemProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
@@ -92,7 +94,10 @@ export function DraggableMediaItem({
           >
             {preview}
             {!isDragging && (
-              <PlusButton className="opacity-0 group-hover:opacity-100" />
+              <PlusButton 
+                className="opacity-0 group-hover:opacity-100" 
+                onClick={onPlusClick}
+              />
             )}
           </AspectRatio>
           {showLabel && (
@@ -138,11 +143,18 @@ export function DraggableMediaItem({
   );
 }
 
-function PlusButton({ className }: { className?: string }) {
+function PlusButton({ className, onClick }: { className?: string; onClick?: () => void }) {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick?.();
+  };
+
   return (
     <Button
       size="icon"
       className={cn("absolute bottom-2 right-2 size-4", className)}
+      onClick={handleClick}
     >
       <Plus className="!size-3" />
     </Button>

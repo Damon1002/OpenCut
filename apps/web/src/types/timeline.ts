@@ -131,7 +131,7 @@ export function canElementGoOnTrack(
   trackType: TrackType
 ): boolean {
   if (elementType === "text") {
-    return trackType === "text";
+    return trackType === "text" || trackType === "media";
   } else if (elementType === "media") {
     return trackType === "media" || trackType === "audio";
   }
@@ -147,7 +147,7 @@ export function validateElementTrackCompatibility(
   if (!isValid) {
     const errorMessage =
       element.type === "text"
-        ? "Text elements can only be placed on text tracks"
+        ? "Text elements can only be placed on text or media tracks"
         : "Media elements can only be placed on media or audio tracks";
 
     return { isValid: false, errorMessage };

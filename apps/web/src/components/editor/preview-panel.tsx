@@ -1,7 +1,7 @@
 "use client";
 
 import { useTimelineStore } from "@/stores/timeline-store";
-import { TimelineElement, TimelineTrack } from "@/types/timeline";
+import { TimelineElement, TimelineTrack, TextElement } from "@/types/timeline";
 import { useMediaStore, type MediaItem } from "@/stores/media-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { useEditorStore } from "@/stores/editor-store";
@@ -17,7 +17,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Play, Pause, Expand } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { formatTimeCode } from "@/lib/time";
 import { FONT_CLASS_MAP } from "@/lib/font-config";
@@ -139,6 +139,116 @@ export function PreviewPanel() {
   // Check if there are any elements in the timeline at all
   const hasAnyElements = tracks.some((track) => track.elements.length > 0);
 
+  // Draggable text component
+  const DraggableText = ({ 
+    element, 
+    track, 
+    index, 
+    scaleRatio 
+  }: { 
+    element: TextElement; 
+    track: TimelineTrack; 
+    index: number; 
+    scaleRatio: number; 
+  }) => {
+    const { updateTextElement } = useTimelineStore();
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const elementRef = useRef<HTMLDivElement>(null);
+
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+      if (!previewRef.current) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const rect = previewRef.current.getBoundingClientRect();
+      const elementRect = elementRef.current?.getBoundingClientRect();
+      
+      if (!elementRect) return;
+      
+      // Calculate offset from mouse to element center
+      const offset = {
+        x: e.clientX - (elementRect.left + elementRect.width / 2),
+        y: e.clientY - (elementRect.top + elementRect.height / 2)
+      };
+      
+      setDragOffset(offset);
+      setIsDragging(true);
+      
+      const handleMouseMove = (e: MouseEvent) => {
+        if (!previewRef.current) return;
+        
+        const rect = previewRef.current.getBoundingClientRect();
+        
+        // Calculate new position relative to preview center
+        const newX = ((e.clientX - offset.x - rect.left) / rect.width - 0.5) * canvasSize.width;
+        const newY = ((e.clientY - offset.y - rect.top) / rect.height - 0.5) * canvasSize.height;
+        
+        // Constrain to canvas bounds
+        const constrainedX = Math.max(
+          -canvasSize.width / 2, 
+          Math.min(canvasSize.width / 2, newX)
+        );
+        const constrainedY = Math.max(
+          -canvasSize.height / 2, 
+          Math.min(canvasSize.height / 2, newY)
+        );
+        
+        updateTextElement(track.id, element.id, {
+          x: constrainedX,
+          y: constrainedY
+        });
+      };
+      
+      const handleMouseUp = () => {
+        setIsDragging(false);
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+      
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }, [element.id, track.id, canvasSize, updateTextElement]);
+
+    const fontClassName = FONT_CLASS_MAP[element.fontFamily as keyof typeof FONT_CLASS_MAP] || "";
+
+    return (
+      <div
+        ref={elementRef}
+        className={`absolute flex items-center justify-center ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} select-none`}
+        style={{
+          left: `${50 + (element.x / canvasSize.width) * 100}%`,
+          top: `${50 + (element.y / canvasSize.height) * 100}%`,
+          transform: `translate(-50%, -50%) rotate(${element.rotation}deg) scale(${scaleRatio})`,
+          opacity: element.opacity,
+          zIndex: 100 + index, // Text elements on top
+        }}
+        onMouseDown={handleMouseDown}
+      >
+        <div
+          className={fontClassName}
+          style={{
+            fontSize: `${element.fontSize}px`,
+            color: element.color,
+            backgroundColor: element.backgroundColor,
+            textAlign: element.textAlign,
+            fontWeight: element.fontWeight,
+            fontStyle: element.fontStyle,
+            textDecoration: element.textDecoration,
+            padding: "4px 8px",
+            borderRadius: "2px",
+            whiteSpace: "nowrap",
+            // Fallback for system fonts that don't have classes
+            ...(fontClassName === "" && { fontFamily: element.fontFamily }),
+          }}
+        >
+          {element.content}
+        </div>
+      </div>
+    );
+  };
+
   // Get media elements for blur background (video/image only)
   const getBlurBackgroundElements = (): ActiveElement[] => {
     return activeElements.filter(
@@ -224,43 +334,16 @@ export function PreviewPanel() {
 
     // Text elements
     if (element.type === "text") {
-      const fontClassName =
-        FONT_CLASS_MAP[element.fontFamily as keyof typeof FONT_CLASS_MAP] || "";
-
       const scaleRatio = previewDimensions.width / canvasSize.width;
 
       return (
-        <div
+        <DraggableText
           key={element.id}
-          className="absolute flex items-center justify-center"
-          style={{
-            left: `${50 + (element.x / canvasSize.width) * 100}%`,
-            top: `${50 + (element.y / canvasSize.height) * 100}%`,
-            transform: `translate(-50%, -50%) rotate(${element.rotation}deg) scale(${scaleRatio})`,
-            opacity: element.opacity,
-            zIndex: 100 + index, // Text elements on top
-          }}
-        >
-          <div
-            className={fontClassName}
-            style={{
-              fontSize: `${element.fontSize}px`,
-              color: element.color,
-              backgroundColor: element.backgroundColor,
-              textAlign: element.textAlign,
-              fontWeight: element.fontWeight,
-              fontStyle: element.fontStyle,
-              textDecoration: element.textDecoration,
-              padding: "4px 8px",
-              borderRadius: "2px",
-              whiteSpace: "nowrap",
-              // Fallback for system fonts that don't have classes
-              ...(fontClassName === "" && { fontFamily: element.fontFamily }),
-            }}
-          >
-            {element.content}
-          </div>
-        </div>
+          element={element as TextElement}
+          track={elementData.track}
+          index={index}
+          scaleRatio={scaleRatio}
+        />
       );
     }
 
