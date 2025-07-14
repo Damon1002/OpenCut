@@ -629,7 +629,7 @@ export function TimelineTrackContent({
           if ((track.type !== "text" && track.type !== "media") || dropPosition !== "on") {
             // Text elements can go on text or media tracks
             const mainTrack = getMainTrack(tracks);
-            let insertIndex: number;
+            let insertIndex: number = 0; // Initialize with default value
 
             if (dropPosition === "above") {
               insertIndex = currentTrackIndex;

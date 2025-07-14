@@ -32,6 +32,9 @@ export function TextView() {
         y: 0,
         rotation: 0,
         opacity: 1,
+        isEditable: true,
+        textShadow: undefined,
+        animation: undefined,
       });
       
       toast.success("Text added to timeline");

@@ -23,6 +23,7 @@ import { formatTimeCode } from "@/lib/time";
 import { FONT_CLASS_MAP } from "@/lib/font-config";
 import { BackgroundSettings } from "../background-settings";
 import { useProjectStore } from "@/stores/project-store";
+import { EditableText } from "./editable-text";
 
 interface ActiveElement {
   element: TimelineElement;
@@ -31,7 +32,7 @@ interface ActiveElement {
 }
 
 export function PreviewPanel() {
-  const { tracks } = useTimelineStore();
+  const { tracks, updateTextElement } = useTimelineStore();
   const { mediaItems } = useMediaStore();
   const { currentTime } = usePlaybackStore();
   const { canvasSize } = useEditorStore();
@@ -151,7 +152,6 @@ export function PreviewPanel() {
     index: number; 
     scaleRatio: number; 
   }) => {
-    const { updateTextElement } = useTimelineStore();
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const elementRef = useRef<HTMLDivElement>(null);
@@ -337,12 +337,17 @@ export function PreviewPanel() {
       const scaleRatio = previewDimensions.width / canvasSize.width;
 
       return (
-        <DraggableText
+        <EditableText
           key={element.id}
           element={element as TextElement}
           track={elementData.track}
           index={index}
           scaleRatio={scaleRatio}
+          canvasSize={canvasSize}
+          previewRef={previewRef}
+          onPositionUpdate={(x, y) => {
+            updateTextElement(elementData.track.id, element.id, { x, y });
+          }}
         />
       );
     }

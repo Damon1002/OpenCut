@@ -10,6 +10,9 @@ import {
   PropertyItemLabel,
   PropertyItemValue,
 } from "./property-item";
+import { AITextProperties } from "./ai-text-properties";
+import { gsap } from "gsap";
+import { useRef, useCallback } from "react";
 
 export function TextProperties({
   element,
@@ -18,7 +21,21 @@ export function TextProperties({
   element: TextElement;
   trackId: string;
 }) {
-  const { updateTextElement } = useTimelineStore();
+  const { updateTextElement, tracks } = useTimelineStore();
+  const gsapRef = useRef<HTMLDivElement>(null);
+
+  // Find the track for this element
+  const track = tracks.find((t) => t.id === trackId);
+
+  // Animation trigger function
+  const playAnimation = useCallback((animation: string) => {
+    // Since we're in the properties panel, we need to find the text element in the canvas
+    // This is a bit tricky since we don't have direct access to the canvas elements
+    // For now, we'll just show a toast that the animation would be triggered
+    console.log(`Animation ${animation} would be triggered for element ${element.id}`);
+  }, [element.id]);
+
+  if (!track) return null;
 
   return (
     <div className="space-y-6 p-5">
@@ -71,6 +88,15 @@ export function TextProperties({
           </div>
         </PropertyItemValue>
       </PropertyItem>
+      
+      {/* AI Text Editor */}
+      <div className="border-t pt-6">
+        <AITextProperties
+          element={element}
+          track={track}
+          onAnimationTrigger={playAnimation}
+        />
+      </div>
     </div>
   );
 }
