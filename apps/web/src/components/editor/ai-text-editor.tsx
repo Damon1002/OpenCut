@@ -211,51 +211,52 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-background rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
+        className="bg-background rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden"
       >
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-blue-500" />
-            <h2 className="text-xl font-semibold">AI Text Editor</h2>
+        <div className="flex items-center justify-between p-8 border-b">
+          <div className="flex items-center gap-4">
+            <Sparkles className="h-8 w-8 text-blue-500" />
+            <h2 className="text-3xl font-semibold">AI Text Editor</h2>
           </div>
-          <Button variant="text" size="icon" onClick={onClose}>
-            <X className="h-4 w-4" />
+          <Button variant="text" size="icon" onClick={onClose} className="h-12 w-12">
+            <X className="h-6 w-6" />
           </Button>
         </div>
 
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+        <div className="p-8 overflow-y-auto max-h-[calc(95vh-140px)]">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="style">AI Styling</TabsTrigger>
-              <TabsTrigger value="animation">Animation</TabsTrigger>
-              <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 h-16">
+              <TabsTrigger value="style" className="text-lg h-14">AI Styling</TabsTrigger>
+              <TabsTrigger value="animation" className="text-lg h-14">Animation</TabsTrigger>
+              <TabsTrigger value="settings" className="text-lg h-14">Settings</TabsTrigger>
             </TabsList>
 
             <TabsContent value="style" className="space-y-6">
               {/* API Key Section */}
               {!aiApiKey && (
-                <Card>
+                <Card className="p-4">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Wand2 className="h-4 w-4" />
+                    <CardTitle className="flex items-center gap-3 text-2xl">
+                      <Wand2 className="h-6 w-6" />
                       Setup Google AI
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-base">
                       Enter your Google AI Studio API key to enable AI-powered text styling
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="apiKey">Google AI API Key</Label>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-3">
+                      <Label htmlFor="apiKey" className="text-lg">Google AI API Key</Label>
                       <Input
                         id="apiKey"
                         type="password"
                         placeholder="Enter your API key"
                         value={aiApiKey}
                         onChange={(e) => setAiApiKey(e.target.value)}
+                        className="h-14 text-base"
                       />
                     </div>
-                    <Button onClick={handleApiKeySave} className="w-full">
+                    <Button onClick={handleApiKeySave} className="w-full h-14 text-lg">
                       Save API Key
                     </Button>
                   </CardContent>
@@ -263,23 +264,23 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
               )}
 
               {/* Quick Styles */}
-              <Card>
+              <Card className="p-4">
                 <CardHeader>
-                  <CardTitle>Quick Styles</CardTitle>
-                  <CardDescription>Apply pre-made styles instantly</CardDescription>
+                  <CardTitle className="text-2xl">Quick Styles</CardTitle>
+                  <CardDescription className="text-base">Apply pre-made styles instantly</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-4">
                     {quickStyles.map((preset) => (
                       <Button
                         key={preset.name}
                         variant="outline"
                         onClick={() => applyStyle(preset.style)}
-                        className="h-auto p-3 text-left"
+                        className="h-auto p-6 text-left"
                       >
                         <div>
-                          <div className="font-medium">{preset.name}</div>
-                          <div className="text-xs text-muted-foreground mt-1">
+                          <div className="font-semibold text-lg">{preset.name}</div>
+                          <div className="text-sm text-muted-foreground mt-2">
                             {preset.style.fontSize}px
                           </div>
                         </div>

@@ -7,9 +7,6 @@ import { TextElement, TimelineTrack } from "@/types/timeline";
 import { useTimelineStore } from "@/stores/timeline-store";
 import { FONT_CLASS_MAP } from "@/lib/font-config";
 import { cn } from "@/lib/utils";
-import { AITextEditor } from "./ai-text-editor";
-import { Button } from "@/components/ui/button";
-import { Sparkles, Settings } from "lucide-react";
 
 interface EditableTextProps {
   element: TextElement;
@@ -34,7 +31,6 @@ export function EditableText({
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [showAIEditor, setShowAIEditor] = useState(false);
   const [editContent, setEditContent] = useState(element.content);
   const [isAnimating, setIsAnimating] = useState(false);
   
@@ -257,55 +253,9 @@ export function EditableText({
             >
               {element.content}
             </div>
-            
-            {/* AI Editor Button */}
-            <AnimatePresence>
-              {!isDragging && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="absolute -top-20 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <div className="flex gap-3 bg-black/95 rounded-xl p-3 shadow-2xl backdrop-blur-md border border-white/30">
-                    <Button
-                      size="sm"
-                      variant="text"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowAIEditor(true);
-                      }}
-                      className="h-12 w-12 p-0 text-white hover:bg-white/20 rounded-xl transition-colors hover:scale-110"
-                    >
-                      <Sparkles className="h-7 w-7" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="text"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // You can add manual style editor here
-                      }}
-                      className="h-12 w-12 p-0 text-white hover:bg-white/20 rounded-xl transition-colors hover:scale-110"
-                    >
-                      <Settings className="h-7 w-7" />
-                    </Button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         )}
       </div>
-
-      {/* AI Text Editor Modal */}
-      <AITextEditor
-        isOpen={showAIEditor}
-        onClose={() => setShowAIEditor(false)}
-        element={element}
-        track={track}
-        onAnimationTrigger={playAnimation}
-      />
     </>
   );
 }
