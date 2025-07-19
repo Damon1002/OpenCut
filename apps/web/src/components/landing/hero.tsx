@@ -3,31 +3,54 @@
 import { motion } from "motion/react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { ArrowRight, Play } from "lucide-react";
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
-import Link from "next/link";
+import { SponsorButton } from "../ui/sponsor-button";
+import { VercelIcon } from "../icons";
+import { ArrowRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 import Image from "next/image";
 import { Handlebars } from "./handlebars";
 
-interface HeroProps {
-  signupCount: number;
-}
-
-export function Hero({ signupCount }: HeroProps) {
+export function Hero() {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
+  const [csrfToken, setCsrfToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch("/api/waitlist/token", {
+      credentials: "include",
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data.token) {
+          setCsrfToken(data.token);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch CSRF token:", err);
+        if (isMounted) {
+          toast.error("Security initialization failed", {
+            description: "Please refresh the page to continue.",
+          });
+        }
+      });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email.trim()) {
-      toast({
-        title: "Email required",
+      toast.error("Email required", {
         description: "Please enter your email address.",
-        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!csrfToken) {
+      toast.error("Security error", {
+        description: "Please refresh the page and try again.",
       });
       return;
     }
@@ -39,32 +62,38 @@ export function Hero({ signupCount }: HeroProps) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken,
         },
+        credentials: "include",
         body: JSON.stringify({ email: email.trim() }),
       });
 
       const data = (await response.json()) as { error: string };
 
       if (response.ok) {
-        toast({
-          title: "Welcome to the waitlist! 🎉",
+        toast.success("Welcome to the waitlist! 🎉", {
           description: "You'll be notified when we launch.",
         });
         setEmail("");
+
+        fetch("/api/waitlist/token", { credentials: "include" })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.token) setCsrfToken(data.token);
+          })
+          .catch((err) => {
+            console.error("Failed to refresh CSRF token:", err);
+          });
       } else {
-        toast({
-          title: "Oops!",
+        toast.error("Oops!", {
           description:
             (data as { error: string }).error ||
             "Something went wrong. Please try again.",
-          variant: "destructive",
         });
       }
     } catch (error) {
-      toast({
-        title: "Network error",
+      toast.error("Network error", {
         description: "Please check your connection and try again.",
-        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -86,6 +115,18 @@ export function Hero({ signupCount }: HeroProps) {
         transition={{ duration: 1 }}
         className="max-w-3xl mx-auto w-full flex-1 flex flex-col justify-center"
       >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.8 }}
+          className="mb-8 flex justify-center"
+        >
+          <SponsorButton 
+            href="https://vercel.com/?utm_source=opencut"
+            logo={VercelIcon}
+            companyName="Vercel"
+          />
+        </motion.div>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -123,7 +164,7 @@ export function Hero({ signupCount }: HeroProps) {
                 className="h-11 text-base flex-1"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !csrfToken}
                 required
               />
             </div>
@@ -131,7 +172,7 @@ export function Hero({ signupCount }: HeroProps) {
               type="submit"
               size="lg"
               className="px-6 h-11 text-base !bg-foreground"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !csrfToken}
             >
               <span className="relative z-10">
                 {isSubmitting ? "Joining..." : "Join waitlist"}
@@ -140,37 +181,15 @@ export function Hero({ signupCount }: HeroProps) {
             </Button>
           </form>
         </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8, duration: 0.6 }}
-          className="mt-8 flex flex-col items-center gap-4"
-        >
-          <div className="flex items-center gap-3">
-            <div className="h-px bg-border flex-1" />
-            <span className="text-sm text-muted-foreground">or</span>
-            <div className="h-px bg-border flex-1" />
-          </div>
-          <Link href="/projects">
-            <Button variant="outline" size="lg" className="px-6 h-11 text-base">
-              <Play className="h-4 w-4 mr-2" />
-              Try Video Editor
-            </Button>
-          </Link>
-        </motion.div>
-
-        {signupCount > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.0, duration: 0.6 }}
-            className="mt-6 inline-flex items-center gap-2 text-sm text-muted-foreground justify-center"
+            transition={{ delay: 0.8, duration: 0.6 }}
+            className="mt-8 inline-flex items-center gap-2 text-sm text-muted-foreground justify-center"
           >
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span>{signupCount.toLocaleString()} people already joined</span>
+            <span>50k+ people already joined</span>
           </motion.div>
-        )}
       </motion.div>
     </div>
   );

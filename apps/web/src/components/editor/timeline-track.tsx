@@ -22,17 +22,21 @@ import {
   TIMELINE_CONSTANTS,
 } from "@/constants/timeline-constants";
 import { useProjectStore } from "@/stores/project-store";
+import { useTimelineSnapping, SnapPoint } from "@/hooks/use-timeline-snapping";
 
 export function TimelineTrackContent({
   track,
   zoomLevel,
+  onSnapPointChange,
 }: {
   track: TimelineTrack;
   zoomLevel: number;
+  onSnapPointChange?: (snapPoint: SnapPoint | null) => void;
 }) {
   const { mediaItems } = useMediaStore();
   const {
     tracks,
+    addTrack,
     moveElementToTrack,
     updateElementStartTime,
     addElementToTrack,
@@ -44,7 +48,64 @@ export function TimelineTrackContent({
     endDrag: endDragAction,
     clearSelectedElements,
     insertTrackAt,
+    snappingEnabled,
   } = useTimelineStore();
+
+  const { currentTime } = usePlaybackStore();
+
+  // Initialize snapping hook
+  const { snapElementPosition, snapElementEdge } = useTimelineSnapping({
+    snapThreshold: 10,
+    enableElementSnapping: snappingEnabled,
+    enablePlayheadSnapping: snappingEnabled,
+  });
+
+  // Helper function for drop snapping that tries both edges
+  const getDropSnappedTime = (
+    dropTime: number,
+    elementDuration: number,
+    excludeElementId?: string
+  ) => {
+    if (!snappingEnabled) {
+      // Use frame snapping if project has FPS, otherwise use decimal snapping
+      const projectStore = useProjectStore.getState();
+      const projectFps = projectStore.activeProject?.fps || 30;
+      return snapTimeToFrame(dropTime, projectFps);
+    }
+
+    // Try snapping both start and end edges for drops
+    const startSnapResult = snapElementEdge(
+      dropTime,
+      elementDuration,
+      tracks,
+      currentTime,
+      zoomLevel,
+      excludeElementId,
+      true // snap to start edge
+    );
+
+    const endSnapResult = snapElementEdge(
+      dropTime,
+      elementDuration,
+      tracks,
+      currentTime,
+      zoomLevel,
+      excludeElementId,
+      false // snap to end edge
+    );
+
+    // Choose the snap result with the smaller distance (closer snap)
+    let bestSnapResult = startSnapResult;
+    if (
+      endSnapResult.snapPoint &&
+      (!startSnapResult.snapPoint ||
+        endSnapResult.snapDistance < startSnapResult.snapDistance)
+    ) {
+      bestSnapResult = endSnapResult;
+    }
+
+    return bestSnapResult.snappedTime;
+  };
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const [isDropping, setIsDropping] = useState(false);
@@ -84,12 +145,71 @@ export function TimelineTrackContent({
         mouseX / (TIMELINE_CONSTANTS.PIXELS_PER_SECOND * zoomLevel)
       );
       const adjustedTime = Math.max(0, mouseTime - dragState.clickOffsetTime);
-      // Use frame snapping if project has FPS, otherwise use decimal snapping
-      const projectStore = useProjectStore.getState();
-      const projectFps = projectStore.activeProject?.fps || 30;
-      const snappedTime = snapTimeToFrame(adjustedTime, projectFps);
 
-      updateDragTime(snappedTime);
+      // Apply snapping if enabled
+      let finalTime = adjustedTime;
+      let snapPoint = null;
+      if (snappingEnabled) {
+        // Find the element being dragged to get its duration
+        let elementDuration = 5; // fallback duration
+        if (dragState.elementId && dragState.trackId) {
+          const sourceTrack = tracks.find((t) => t.id === dragState.trackId);
+          const element = sourceTrack?.elements.find(
+            (e) => e.id === dragState.elementId
+          );
+          if (element) {
+            elementDuration =
+              element.duration - element.trimStart - element.trimEnd;
+          }
+        }
+
+        // Try snapping both start and end edges
+        const startSnapResult = snapElementEdge(
+          adjustedTime,
+          elementDuration,
+          tracks,
+          currentTime,
+          zoomLevel,
+          dragState.elementId || undefined,
+          true // snap to start edge
+        );
+
+        const endSnapResult = snapElementEdge(
+          adjustedTime,
+          elementDuration,
+          tracks,
+          currentTime,
+          zoomLevel,
+          dragState.elementId || undefined,
+          false // snap to end edge
+        );
+
+        // Choose the snap result with the smaller distance (closer snap)
+        let bestSnapResult = startSnapResult;
+        if (
+          endSnapResult.snapPoint &&
+          (!startSnapResult.snapPoint ||
+            endSnapResult.snapDistance < startSnapResult.snapDistance)
+        ) {
+          bestSnapResult = endSnapResult;
+        }
+
+        finalTime = bestSnapResult.snappedTime;
+        snapPoint = bestSnapResult.snapPoint;
+
+        // Notify parent component about snap point change
+        onSnapPointChange?.(snapPoint);
+      } else {
+        // Use frame snapping if project has FPS, otherwise use decimal snapping
+        const projectStore = useProjectStore.getState();
+        const projectFps = projectStore.activeProject?.fps || 30;
+        finalTime = snapTimeToFrame(adjustedTime, projectFps);
+
+        // Clear snap point when not snapping
+        onSnapPointChange?.(null);
+      }
+
+      updateDragTime(finalTime);
     };
 
     const handleMouseUp = (e: MouseEvent) => {
@@ -107,6 +227,8 @@ export function TimelineTrackContent({
             dragState.currentTime
           );
           endDragAction();
+          // Clear snap point when drag ends
+          onSnapPointChange?.(null);
         }
         return;
       }
@@ -203,6 +325,8 @@ export function TimelineTrackContent({
 
       if (isTrackThatStartedDrag) {
         endDragAction();
+        // Clear snap point when drag ends
+        onSnapPointChange?.(null);
       }
     };
 
@@ -228,6 +352,7 @@ export function TimelineTrackContent({
     endDragAction,
     selectedElements,
     selectElement,
+    onSnapPointChange,
   ]);
 
   const handleElementMouseDown = (
@@ -299,12 +424,16 @@ export function TimelineTrackContent({
       return;
     }
 
-    // Handle single selection - always select the clicked element
-    // This ensures that clicking a text element will select it and make it available for editing
-    selectElement(track.id, element.id, false);
-    
-    // Reset mouse down location for next interaction
-    setMouseDownLocation(null);
+    // Handle single selection
+    const isSelected = selectedElements.some(
+      (c) => c.trackId === track.id && c.elementId === element.id
+    );
+
+    if (!isSelected) {
+      // If element is not selected, select it (replacing other selections)
+      selectElement(track.id, element.id, false);
+    }
+    // If element is already selected, keep it selected (do nothing)
   };
 
   const handleTrackDragOver = (e: React.DragEvent) => {
@@ -345,9 +474,10 @@ export function TimelineTrackContent({
           if (dragData.type === "text") {
             // Text elements have default duration of 5 seconds
             const newElementDuration = 5;
-            const projectStore = useProjectStore.getState();
-            const projectFps = projectStore.activeProject?.fps || 30;
-            const snappedTime = snapTimeToFrame(dropTime, projectFps);
+            const snappedTime = getDropSnappedTime(
+              dropTime,
+              newElementDuration
+            );
             const newElementEnd = snappedTime + newElementDuration;
 
             wouldOverlap = track.elements.some((existingElement) => {
@@ -366,9 +496,10 @@ export function TimelineTrackContent({
             );
             if (mediaItem) {
               const newElementDuration = mediaItem.duration || 5;
-              const projectStore = useProjectStore.getState();
-              const projectFps = projectStore.activeProject?.fps || 30;
-              const snappedTime = snapTimeToFrame(dropTime, projectFps);
+              const snappedTime = getDropSnappedTime(
+                dropTime,
+                newElementDuration
+              );
               const newElementEnd = snappedTime + newElementDuration;
 
               wouldOverlap = track.elements.some((existingElement) => {
@@ -408,9 +539,11 @@ export function TimelineTrackContent({
               movingElement.duration -
               movingElement.trimStart -
               movingElement.trimEnd;
-            const projectStore = useProjectStore.getState();
-            const projectFps = projectStore.activeProject?.fps || 30;
-            const snappedTime = snapTimeToFrame(dropTime, projectFps);
+            const snappedTime = getDropSnappedTime(
+              dropTime,
+              movingElementDuration,
+              elementId
+            );
             const movingElementEnd = snappedTime + movingElementDuration;
 
             wouldOverlap = track.elements.some((existingElement) => {
@@ -437,17 +570,15 @@ export function TimelineTrackContent({
     if (wouldOverlap) {
       e.dataTransfer.dropEffect = "none";
       setWouldOverlap(true);
-      const projectStore = useProjectStore.getState();
-      const projectFps = projectStore.activeProject?.fps || 30;
-      setDropPosition(snapTimeToFrame(dropTime, projectFps));
+      // Use default duration for position indicator
+      setDropPosition(getDropSnappedTime(dropTime, 5));
       return;
     }
 
     e.dataTransfer.dropEffect = hasTimelineElement ? "move" : "copy";
     setWouldOverlap(false);
-    const projectStore = useProjectStore.getState();
-    const projectFps = projectStore.activeProject?.fps || 30;
-    setDropPosition(snapTimeToFrame(dropTime, projectFps));
+    // Use default duration for position indicator
+    setDropPosition(getDropSnappedTime(dropTime, 5));
   };
 
   const handleTrackDragEnter = (e: React.DragEvent) => {
@@ -490,6 +621,16 @@ export function TimelineTrackContent({
   const handleTrackDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Debug logging
+    console.log(
+      JSON.stringify({
+        message: "Drop event started in timeline track",
+        dataTransferTypes: Array.from(e.dataTransfer.types),
+        trackId: track.id,
+        trackType: track.type,
+      })
+    );
 
     // Reset all drag states
     dragCounterRef.current = 0;
@@ -559,18 +700,20 @@ export function TimelineTrackContent({
           return;
         }
 
-        // Adjust position based on where user clicked on the element
-        const adjustedStartTime = snappedTime - clickOffsetTime;
-        const finalStartTime = Math.max(
-          0,
-          snapTimeToFrame(adjustedStartTime, projectFps)
-        );
-
         // Check for overlaps with existing elements (excluding the moving element itself)
         const movingElementDuration =
           movingElement.duration -
           movingElement.trimStart -
           movingElement.trimEnd;
+
+        // Adjust position based on where user clicked on the element
+        const adjustedStartTime = newStartTime - clickOffsetTime;
+        const snappedStartTime = getDropSnappedTime(
+          adjustedStartTime,
+          movingElementDuration,
+          elementId
+        );
+        const finalStartTime = Math.max(0, snappedStartTime);
         const movingElementEnd = finalStartTime + movingElementDuration;
 
         const hasOverlap = track.elements.some((existingElement) => {
@@ -622,58 +765,45 @@ export function TimelineTrackContent({
           let targetTrack = track;
 
           // Handle position-aware track creation for text
-          if ((track.type !== "text" && track.type !== "media") || dropPosition !== "on") {
-            // Text elements can go on text or media tracks
+          if (track.type !== "text" || dropPosition !== "on") {
+            // Text tracks should go above the main track
             const mainTrack = getMainTrack(tracks);
-            let insertIndex: number = 0; // Initialize with default value
+            let insertIndex: number;
 
             if (dropPosition === "above") {
               insertIndex = currentTrackIndex;
             } else if (dropPosition === "below") {
               insertIndex = currentTrackIndex + 1;
             } else {
-              // dropPosition === "on" but track is not text or media type
-              // Try to use main track if it exists and is compatible
-              if (mainTrack && (mainTrack.type === "text" || mainTrack.type === "media")) {
-                targetTrackId = mainTrack.id;
-                targetTrack = mainTrack;
-              } else {
-                // Create new text track above main track if main track exists, otherwise at top
-                if (mainTrack) {
-                  const mainTrackIndex = tracks.findIndex(
-                    (t) => t.id === mainTrack.id
-                  );
-                  insertIndex = mainTrackIndex;
-                } else {
-                  insertIndex = 0; // Top of timeline
-                }
-                targetTrackId = insertTrackAt("text", insertIndex);
-                // Get the updated tracks array after creating the new track
-                const updatedTracks = useTimelineStore.getState().tracks;
-                const newTargetTrack = updatedTracks.find(
-                  (t) => t.id === targetTrackId
+              // dropPosition === "on" but track is not text type
+              // Insert above main track if main track exists, otherwise at top
+              if (mainTrack) {
+                const mainTrackIndex = tracks.findIndex(
+                  (t) => t.id === mainTrack.id
                 );
-                if (!newTargetTrack) return;
-                targetTrack = newTargetTrack;
+                insertIndex = mainTrackIndex;
+              } else {
+                insertIndex = 0; // Top of timeline
               }
             }
 
-            // Only create new track if we need to insert at a specific position
-            if (dropPosition !== "on") {
-              targetTrackId = insertTrackAt("text", insertIndex);
-              // Get the updated tracks array after creating the new track
-              const updatedTracks = useTimelineStore.getState().tracks;
-              const newTargetTrack = updatedTracks.find(
-                (t) => t.id === targetTrackId
-              );
-              if (!newTargetTrack) return;
-              targetTrack = newTargetTrack;
-            }
+            targetTrackId = insertTrackAt("text", insertIndex);
+            // Get the updated tracks array after creating the new track
+            const updatedTracks = useTimelineStore.getState().tracks;
+            const newTargetTrack = updatedTracks.find(
+              (t) => t.id === targetTrackId
+            );
+            if (!newTargetTrack) return;
+            targetTrack = newTargetTrack;
           }
 
           // Check for overlaps with existing elements in target track
           const newElementDuration = 5; // Default text duration
-          const newElementEnd = snappedTime + newElementDuration;
+          const textSnappedTime = getDropSnappedTime(
+            newStartTime,
+            newElementDuration
+          );
+          const newElementEnd = textSnappedTime + newElementDuration;
 
           const hasOverlap = targetTrack.elements.some((existingElement) => {
             const existingStart = existingElement.startTime;
@@ -684,7 +814,9 @@ export function TimelineTrackContent({
                 existingElement.trimEnd);
 
             // Check if elements overlap
-            return snappedTime < existingEnd && newElementEnd > existingStart;
+            return (
+              textSnappedTime < existingEnd && newElementEnd > existingStart
+            );
           });
 
           if (hasOverlap) {
@@ -699,7 +831,7 @@ export function TimelineTrackContent({
             name: dragData.name || "Text",
             content: dragData.content || "Default Text",
             duration: TIMELINE_CONSTANTS.DEFAULT_TEXT_DURATION,
-            startTime: snappedTime,
+            startTime: textSnappedTime,
             trimStart: 0,
             trimEnd: 0,
             fontSize: 48,
@@ -740,68 +872,28 @@ export function TimelineTrackContent({
 
           // Handle position-aware track creation for media elements
           if (!isCompatible || dropPosition !== "on") {
-            const needsNewTrack = !isCompatible || dropPosition !== "on";
+            if (isVideoOrImage) {
+              // For video/image, check if we need a main track or additional media track
+              const mainTrack = getMainTrack(tracks);
 
-            if (needsNewTrack) {
-              if (isVideoOrImage) {
-                // For video/image, check if we need a main track or additional media track
-                const mainTrack = getMainTrack(tracks);
-
-                if (!mainTrack) {
-                  // No main track exists, create it
-                  const updatedTracks = ensureMainTrack(tracks);
-                  const newMainTrack = getMainTrack(updatedTracks);
-                  if (newMainTrack && newMainTrack.elements.length === 0) {
-                    targetTrackId = newMainTrack.id;
-                    targetTrack = newMainTrack;
-                  } else {
-                    // Main track was created but somehow has elements, create new media track
-                    const mainTrackIndex = updatedTracks.findIndex(
-                      (t) => t.id === newMainTrack?.id
-                    );
-                    targetTrackId = insertTrackAt("media", mainTrackIndex);
-                    const updatedTracksAfterInsert =
-                      useTimelineStore.getState().tracks;
-                    const newTargetTrack = updatedTracksAfterInsert.find(
-                      (t) => t.id === targetTrackId
-                    );
-                    if (!newTargetTrack) return;
-                    targetTrack = newTargetTrack;
-                  }
-                } else if (
-                  mainTrack.elements.length === 0 &&
-                  dropPosition === "on"
-                ) {
-                  // Main track exists and is empty, use it
-                  targetTrackId = mainTrack.id;
-                  targetTrack = mainTrack;
-                } else {
-                  // Create new media track above main track
-                  const mainTrackIndex = tracks.findIndex(
-                    (t) => t.id === mainTrack.id
-                  );
-                  let insertIndex: number;
-
-                  if (dropPosition === "above") {
-                    insertIndex = currentTrackIndex;
-                  } else if (dropPosition === "below") {
-                    insertIndex = currentTrackIndex + 1;
-                  } else {
-                    // Insert above main track
-                    insertIndex = mainTrackIndex;
-                  }
-
-                  targetTrackId = insertTrackAt("media", insertIndex);
-                  const updatedTracks = useTimelineStore.getState().tracks;
-                  const newTargetTrack = updatedTracks.find(
-                    (t) => t.id === targetTrackId
-                  );
-                  if (!newTargetTrack) return;
-                  targetTrack = newTargetTrack;
-                }
-              } else if (isAudio) {
-                // Audio tracks go at the bottom
-                const mainTrack = getMainTrack(tracks);
+              if (!mainTrack) {
+                // No main track exists, create it
+                targetTrackId = addTrack("media");
+                const updatedTracks = useTimelineStore.getState().tracks;
+                const newTargetTrack = updatedTracks.find(
+                  (t) => t.id === targetTrackId
+                );
+                if (!newTargetTrack) return;
+                targetTrack = newTargetTrack;
+              } else if (
+                mainTrack.elements.length === 0 &&
+                dropPosition === "on"
+              ) {
+                // Main track exists and is empty, use it
+                targetTrackId = mainTrack.id;
+                targetTrack = mainTrack;
+              } else {
+                // Create new media track
                 let insertIndex: number;
 
                 if (dropPosition === "above") {
@@ -809,18 +901,14 @@ export function TimelineTrackContent({
                 } else if (dropPosition === "below") {
                   insertIndex = currentTrackIndex + 1;
                 } else {
-                  // Insert after main track (bottom area)
-                  if (mainTrack) {
-                    const mainTrackIndex = tracks.findIndex(
-                      (t) => t.id === mainTrack.id
-                    );
-                    insertIndex = mainTrackIndex + 1;
-                  } else {
-                    insertIndex = tracks.length; // Bottom of timeline
-                  }
+                  // Insert above main track
+                  const mainTrackIndex = tracks.findIndex(
+                    (t) => t.id === mainTrack.id
+                  );
+                  insertIndex = mainTrackIndex;
                 }
 
-                targetTrackId = insertTrackAt("audio", insertIndex);
+                targetTrackId = insertTrackAt("media", insertIndex);
                 const updatedTracks = useTimelineStore.getState().tracks;
                 const newTargetTrack = updatedTracks.find(
                   (t) => t.id === targetTrackId
@@ -828,6 +916,34 @@ export function TimelineTrackContent({
                 if (!newTargetTrack) return;
                 targetTrack = newTargetTrack;
               }
+            } else if (isAudio) {
+              // Audio tracks go at the bottom
+              const mainTrack = getMainTrack(tracks);
+              let insertIndex: number;
+
+              if (dropPosition === "above") {
+                insertIndex = currentTrackIndex;
+              } else if (dropPosition === "below") {
+                insertIndex = currentTrackIndex + 1;
+              } else {
+                // Insert after main track (bottom area)
+                if (mainTrack) {
+                  const mainTrackIndex = tracks.findIndex(
+                    (t) => t.id === mainTrack.id
+                  );
+                  insertIndex = mainTrackIndex + 1;
+                } else {
+                  insertIndex = tracks.length; // Bottom of timeline
+                }
+              }
+
+              targetTrackId = insertTrackAt("audio", insertIndex);
+              const updatedTracks = useTimelineStore.getState().tracks;
+              const newTargetTrack = updatedTracks.find(
+                (t) => t.id === targetTrackId
+              );
+              if (!newTargetTrack) return;
+              targetTrack = newTargetTrack;
             }
           }
 
@@ -835,7 +951,11 @@ export function TimelineTrackContent({
 
           // Check for overlaps with existing elements in target track
           const newElementDuration = mediaItem.duration || 5;
-          const newElementEnd = snappedTime + newElementDuration;
+          const mediaSnappedTime = getDropSnappedTime(
+            newStartTime,
+            newElementDuration
+          );
+          const newElementEnd = mediaSnappedTime + newElementDuration;
 
           const hasOverlap = targetTrack.elements.some((existingElement) => {
             const existingStart = existingElement.startTime;
@@ -846,7 +966,9 @@ export function TimelineTrackContent({
                 existingElement.trimEnd);
 
             // Check if elements overlap
-            return snappedTime < existingEnd && newElementEnd > existingStart;
+            return (
+              mediaSnappedTime < existingEnd && newElementEnd > existingStart
+            );
           });
 
           if (hasOverlap) {
@@ -861,7 +983,7 @@ export function TimelineTrackContent({
             mediaId: mediaItem.id,
             name: mediaItem.name,
             duration: mediaItem.duration || 5,
-            startTime: snappedTime,
+            startTime: mediaSnappedTime,
             trimStart: 0,
             trimEnd: 0,
           });

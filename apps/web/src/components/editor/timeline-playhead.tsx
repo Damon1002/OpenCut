@@ -2,10 +2,7 @@
 
 import { useRef } from "react";
 import { TimelineTrack } from "@/types/timeline";
-import {
-  TIMELINE_CONSTANTS,
-  getTotalTracksHeight,
-} from "@/constants/timeline-constants";
+import { TIMELINE_CONSTANTS } from "@/constants/timeline-constants";
 import { useTimelinePlayhead } from "@/hooks/use-timeline-playhead";
 
 interface TimelinePlayheadProps {
@@ -16,10 +13,10 @@ interface TimelinePlayheadProps {
   seek: (time: number) => void;
   rulerRef: React.RefObject<HTMLDivElement>;
   rulerScrollRef: React.RefObject<HTMLDivElement>;
-  tracksScrollRef: React.RefObject<HTMLDivElement>;
   trackLabelsRef?: React.RefObject<HTMLDivElement>;
   timelineRef: React.RefObject<HTMLDivElement>;
   playheadRef?: React.RefObject<HTMLDivElement>;
+  isSnappingToPlayhead?: boolean;
 }
 
 export function TimelinePlayhead({
@@ -30,22 +27,20 @@ export function TimelinePlayhead({
   seek,
   rulerRef,
   rulerScrollRef,
-  tracksScrollRef,
   trackLabelsRef,
   timelineRef,
   playheadRef: externalPlayheadRef,
+  isSnappingToPlayhead = false,
 }: TimelinePlayheadProps) {
   const internalPlayheadRef = useRef<HTMLDivElement>(null);
   const playheadRef = externalPlayheadRef || internalPlayheadRef;
-  const { playheadPosition, handlePlayheadMouseDown } = useTimelinePlayhead({
+  const { playheadPosition, handleRulerMouseDown } = useTimelinePlayhead({
     currentTime,
     duration,
     zoomLevel,
     seek,
     rulerRef,
     rulerScrollRef,
-    tracksScrollRef,
-    playheadRef,
   });
 
   // Use timeline container height minus a few pixels for breathing room
@@ -64,20 +59,24 @@ export function TimelinePlayhead({
   return (
     <div
       ref={playheadRef}
-      className="absolute pointer-events-auto z-[100]"
+      className="absolute pointer-events-auto z-[50]"
       style={{
         left: `${leftPosition}px`,
         top: 0,
         height: `${totalHeight}px`,
         width: "2px", // Slightly wider for better click target
       }}
-      onMouseDown={handlePlayheadMouseDown}
+      onMouseDown={handleRulerMouseDown}
     >
-      {/* The red line spanning full height */}
-      <div className="absolute left-0 w-0.5 bg-foreground cursor-col-resize h-full" />
+      {/* The playhead line spanning full height */}
+      <div
+        className={`absolute left-0 w-0.5 cursor-col-resize h-full ${isSnappingToPlayhead ? "bg-primary" : "bg-foreground"}`}
+      />
 
-      {/* Red dot indicator at the top (in ruler area) */}
-      <div className="absolute top-1 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-foreground rounded-full border-2 border-foreground shadow-sm" />
+      {/* Playhead dot indicator at the top (in ruler area) */}
+      <div
+        className={`absolute top-1 left-1/2 transform -translate-x-1/2 w-3 h-3 rounded-full border-2 shadow-sm ${isSnappingToPlayhead ? "bg-primary border-primary" : "bg-foreground border-foreground"}`}
+      />
     </div>
   );
 }
@@ -90,21 +89,24 @@ export function useTimelinePlayheadRuler({
   seek,
   rulerRef,
   rulerScrollRef,
-  tracksScrollRef,
-  playheadRef,
-}: Omit<TimelinePlayheadProps, "tracks" | "trackLabelsRef" | "timelineRef">) {
-  const { handleRulerMouseDown, isDraggingRuler } = useTimelinePlayhead({
+}: Omit<
+  TimelinePlayheadProps,
+  | "tracks"
+  | "trackLabelsRef"
+  | "timelineRef"
+  | "tracksScrollRef"
+  | "playheadRef"
+>) {
+  const { handleRulerMouseDown } = useTimelinePlayhead({
     currentTime,
     duration,
     zoomLevel,
     seek,
     rulerRef,
     rulerScrollRef,
-    tracksScrollRef,
-    playheadRef,
   });
 
-  return { handleRulerMouseDown, isDraggingRuler };
+  return { handleRulerMouseDown };
 }
 
 export { TimelinePlayhead as default };
