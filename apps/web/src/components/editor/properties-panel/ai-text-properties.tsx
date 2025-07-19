@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { secureKeyManager } from "@/lib/security/key-manager";
 import { TextElement, TimelineTrack } from "@/types/timeline";
 import { useTimelineStore } from "@/stores/timeline-store";
+import { useProjectStore } from "@/stores/project-store";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -43,23 +45,38 @@ export function AITextProperties({
   onAnimationTrigger,
 }: AITextPropertiesProps) {
   const { updateTextElement } = useTimelineStore();
+  const { updateBackgroundType } = useProjectStore();
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [generatedStyles, setGeneratedStyles] = useState<any[]>([]);
   const [aiApiKey, setAiApiKey] = useState("");
+  const [textContent, setTextContent] = useState(element.content);
 
-  // Load API key from localStorage
+  // Initialize security and load API key
   useEffect(() => {
-    const savedApiKey = localStorage.getItem("google-ai-api-key");
-    if (savedApiKey) {
-      setAiApiKey(savedApiKey);
-    }
+    (async () => {
+      await secureKeyManager.initialize();
+      const savedApiKey = await secureKeyManager.getApiKey("google-ai");
+      if (savedApiKey) {
+        setAiApiKey(savedApiKey);
+      }
+    })();
   }, []);
 
-  // Save API key to localStorage
-  const handleApiKeySave = () => {
-    localStorage.setItem("google-ai-api-key", aiApiKey);
-    toast.success("API key saved successfully");
+  // Save API key securely
+  const handleApiKeySave = async () => {
+    try {
+      if (!secureKeyManager.validateApiKey(aiApiKey, 'google-ai')) {
+        toast.error("Invalid API key format");
+        return;
+      }
+
+      await secureKeyManager.storeApiKey("google-ai", aiApiKey);
+      toast.success("API key saved securely");
+    } catch (error) {
+      console.error("Failed to save API key securely", error);
+      toast.error("Failed to save API key securely");
+    }
   };
 
   // Generate styles using Google AI
@@ -148,6 +165,16 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
     if (style.opacity !== undefined) updates.opacity = style.opacity;
 
     updateTextElement(track.id, element.id, updates);
+    
+    // Apply canvas background changes if specified
+    if (style.canvasBackground) {
+      if (style.canvasBackground.type === 'color') {
+        updateBackgroundType('color', { backgroundColor: style.canvasBackground.value });
+      } else if (style.canvasBackground.type === 'blur') {
+        updateBackgroundType('blur', { blurIntensity: style.canvasBackground.value });
+      }
+    }
+    
     toast.success(`Applied ${style.name} style`);
   };
 
@@ -180,6 +207,68 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
         textShadow: "0 0 20px #00ff00, 0 0 30px #00ff00",
       },
     },
+    {
+      name: "Dark BG",
+      style: {
+        fontSize: 42,
+        fontWeight: "bold",
+        color: "#ffffff",
+        canvasBackground: {
+          type: 'color',
+          value: '#000000'
+        }
+      },
+    },
+    {
+      name: "Blue BG",
+      style: {
+        fontSize: 40,
+        fontWeight: "600",
+        color: "#ffffff",
+        textShadow: "1px 1px 2px rgba(0,0,0,0.5)",
+        canvasBackground: {
+          type: 'color',
+          value: '#1e40af'
+        }
+      },
+    },
+    {
+      name: "Pink BG",
+      style: {
+        fontSize: 38,
+        fontWeight: "bold",
+        color: "#ffffff",
+        canvasBackground: {
+          type: 'color',
+          value: '#ec4899'
+        }
+      },
+    },
+    {
+      name: "Green BG",
+      style: {
+        fontSize: 40,
+        fontWeight: "600",
+        color: "#ffffff",
+        canvasBackground: {
+          type: 'color',
+          value: '#059669'
+        }
+      },
+    },
+    {
+      name: "Blur BG",
+      style: {
+        fontSize: 44,
+        fontWeight: "bold",
+        color: "#ffffff",
+        textShadow: "2px 2px 4px rgba(0,0,0,0.8)",
+        canvasBackground: {
+          type: 'blur',
+          value: 12
+        }
+      },
+    },
   ];
 
   // Handle animation trigger
@@ -210,7 +299,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
               <CardDescription className="text-xs">Apply pre-made styles instantly</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {quickStyles.map((preset) => (
                   <Button
                     key={preset.name}
@@ -219,9 +308,9 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                     className="h-auto p-2 text-left text-xs"
                   >
                     <div>
-                      <div className="font-medium">{preset.name}</div>
+                      <div className="font-medium text-xs">{preset.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {preset.style.fontSize}px
+                        {preset.style.fontSize ? `${preset.style.fontSize}px` : 'Custom'}
                       </div>
                     </div>
                   </Button>

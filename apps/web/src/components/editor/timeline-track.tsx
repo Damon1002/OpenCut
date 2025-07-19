@@ -299,16 +299,12 @@ export function TimelineTrackContent({
       return;
     }
 
-    // Handle single selection
-    const isSelected = selectedElements.some(
-      (c) => c.trackId === track.id && c.elementId === element.id
-    );
-
-    if (!isSelected) {
-      // If element is not selected, select it (replacing other selections)
-      selectElement(track.id, element.id, false);
-    }
-    // If element is already selected, keep it selected (do nothing)
+    // Handle single selection - always select the clicked element
+    // This ensures that clicking a text element will select it and make it available for editing
+    selectElement(track.id, element.id, false);
+    
+    // Reset mouse down location for next interaction
+    setMouseDownLocation(null);
   };
 
   const handleTrackDragOver = (e: React.DragEvent) => {

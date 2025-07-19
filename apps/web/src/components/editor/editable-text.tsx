@@ -27,12 +27,13 @@ export function EditableText({
   onPositionUpdate,
   previewRef: externalPreviewRef,
 }: EditableTextProps) {
-  const { updateTextElement } = useTimelineStore();
+  const { updateTextElement, selectElement } = useTimelineStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [editContent, setEditContent] = useState(element.content);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
   
   const elementRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -53,6 +54,9 @@ export function EditableText({
     
     e.preventDefault();
     e.stopPropagation();
+    
+    // Store mouse down position to detect clicks vs drags
+    setMouseDownPos({ x: e.clientX, y: e.clientY });
     
     const elementRect = elementRef.current?.getBoundingClientRect();
     if (!elementRect) return;
@@ -94,6 +98,28 @@ export function EditableText({
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   }, [isEditing, canvasSize, onPositionUpdate]);
+
+  // Handle single click to select element
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (isEditing) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Check if this was a click (not a drag)
+    if (mouseDownPos) {
+      const deltaX = Math.abs(e.clientX - mouseDownPos.x);
+      const deltaY = Math.abs(e.clientY - mouseDownPos.y);
+      
+      // If mouse didn't move much, it's a click
+      if (deltaX < 5 && deltaY < 5) {
+        // Select this text element in the timeline
+        selectElement(track.id, element.id, false);
+      }
+    }
+    
+    setMouseDownPos(null);
+  }, [isEditing, mouseDownPos, selectElement, track.id, element.id]);
 
   // Handle text editing
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -201,6 +227,7 @@ export function EditableText({
         }}
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
+        onClick={handleClick}
       >
         {isEditing ? (
           <motion.div

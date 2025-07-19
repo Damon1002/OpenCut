@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { secureKeyManager } from "@/lib/security/key-manager";
 import { TextElement, TimelineTrack } from "@/types/timeline";
 import { useTimelineStore } from "@/stores/timeline-store";
 import { Button } from "@/components/ui/button";
@@ -61,19 +62,34 @@ export function AITextEditor({
   const [aiApiKey, setAiApiKey] = useState("");
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Load API key from localStorage
-  useEffect(() => {
-    const savedApiKey = localStorage.getItem("google-ai-api-key");
+// Initialize security and load API key
+useEffect(() => {
+  (async () => {
+    await secureKeyManager.initialize();
+    const savedApiKey = await secureKeyManager.getApiKey("google-ai");
     if (savedApiKey) {
       setAiApiKey(savedApiKey);
     }
-  }, []);
+  })();
+}, []);
 
-  // Save API key to localStorage
-  const handleApiKeySave = () => {
-    localStorage.setItem("google-ai-api-key", aiApiKey);
-    toast.success("API key saved successfully");
-  };
+// Save API key securely
+type ApiKeyType = 'google-ai' | 'openai' | 'anthropic';
+
+const handleApiKeySave = async () => {
+  try {
+    if (!secureKeyManager.validateApiKey(aiApiKey as string, 'google-ai')) {
+      toast.error("Invalid API key format");
+      return;
+    }
+
+    await secureKeyManager.storeApiKey("google-ai", aiApiKey as string);
+    toast.success("API key saved securely");
+  } catch (error) {
+    console.error("Failed to save API key securely", error);
+    toast.error("Failed to save API key securely");
+  }
+};
 
   // Generate styles using Google AI
   const generateStyles = async () => {
@@ -184,15 +200,44 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
         fontStyle: "italic",
       },
     },
-    {
-      name: "Neon Glow",
-      style: {
-        fontSize: 48,
-        fontWeight: "bold",
-        color: "#00ff00",
-        textShadow: "0 0 20px #00ff00, 0 0 30px #00ff00",
-      },
-    },
+{
+    name: "Neon Glow",
+    style: {
+      fontSize: 48,
+      fontWeight: "bold",
+      color: "#00ff00",
+      textShadow: "0 0 20px #00ff00, 0 0 30px #00ff00"
+    }
+  },
+  {
+    name: "Background",
+    style: {
+      backgroundColor: "#000000",
+      color: "#ffffff"
+    }
+  },
+  {
+    name: "Image Background",
+    style: {
+      backgroundImage: "url('background.jpg')"
+    }
+  },
+  {
+    name: "Video Background",
+    style: {
+      backgroundImage: "url('background.mp4')",
+      backgroundSize: "cover"
+    }
+  },
+  {
+    name: "Custom Style",
+    style: {
+      fontSize: 22,
+      fontStyle: "italic",
+      backgroundColor: "#ff0",
+      color: "#333"
+    }
+  }
   ];
 
   // Handle animation trigger
@@ -270,18 +315,18 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                   <CardDescription className="text-base">Apply pre-made styles instantly</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-2">
                     {quickStyles.map((preset) => (
                       <Button
                         key={preset.name}
                         variant="outline"
                         onClick={() => applyStyle(preset.style)}
-                        className="h-auto p-6 text-left"
+                        className="h-auto p-3 text-left text-xs"
                       >
                         <div>
-                          <div className="font-semibold text-lg">{preset.name}</div>
-                          <div className="text-sm text-muted-foreground mt-2">
-                            {preset.style.fontSize}px
+                          <div className="font-semibold text-sm">{preset.name}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {preset.style.fontSize ? `${preset.style.fontSize}px` : 'Custom'}
                           </div>
                         </div>
                       </Button>
