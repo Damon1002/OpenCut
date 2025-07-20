@@ -29,11 +29,17 @@ export function TextProperties({
 
   // Animation trigger function
   const playAnimation = useCallback((animation: string) => {
-    // Since we're in the properties panel, we need to find the text element in the canvas
-    // This is a bit tricky since we don't have direct access to the canvas elements
-    // For now, we'll just show a toast that the animation would be triggered
-    console.log(`Animation ${animation} would be triggered for element ${element.id}`);
-  }, [element.id]);
+    // Dispatch custom event to trigger animation on the text element in the preview
+    const animationEvent = new CustomEvent('triggerTextAnimation', {
+      detail: {
+        elementId: element.id,
+        trackId: trackId,
+        animation: animation
+      }
+    });
+    window.dispatchEvent(animationEvent);
+    console.log(`Triggered ${animation} animation for element ${element.id}`);
+  }, [element.id, trackId]);
 
   if (!track) return null;
 
@@ -56,36 +62,6 @@ export function TextProperties({
               updateTextElement(trackId, element.id, { fontFamily: value })
             }
           />
-        </PropertyItemValue>
-      </PropertyItem>
-      <PropertyItem direction="column">
-        <PropertyItemLabel>Font size</PropertyItemLabel>
-        <PropertyItemValue>
-          <div className="flex items-center gap-2">
-            <Slider
-              defaultValue={[element.fontSize]}
-              min={8}
-              max={300}
-              step={1}
-              onValueChange={([value]) =>
-                updateTextElement(trackId, element.id, { fontSize: value })
-              }
-              className="w-full"
-            />
-            <Input
-              type="number"
-              value={element.fontSize}
-              onChange={(e) =>
-                updateTextElement(trackId, element.id, {
-                  fontSize: parseInt(e.target.value),
-                })
-              }
-              className="w-12 !text-xs h-7 rounded-sm text-center
-               [appearance:textfield]
-               [&::-webkit-outer-spin-button]:appearance-none
-               [&::-webkit-inner-spin-button]:appearance-none"
-            />
-          </div>
         </PropertyItemValue>
       </PropertyItem>
       

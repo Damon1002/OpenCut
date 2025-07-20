@@ -27,6 +27,24 @@ export const FONT_OPTIONS: FontOption[] = [
     category: "system",
     hasClassName: false,
   },
+  {
+    value: "Courier New",
+    label: "Courier New",
+    category: "system",
+    hasClassName: false,
+  },
+  {
+    value: "Impact",
+    label: "Impact",
+    category: "system",
+    hasClassName: false,
+  },
+  {
+    value: "Verdana",
+    label: "Verdana",
+    category: "system",
+    hasClassName: false,
+  },
 
   // Google Fonts (loaded in layout.tsx)
   {
@@ -59,6 +77,43 @@ export const FONT_OPTIONS: FontOption[] = [
     value: "Comic Neue",
     label: "Comic Neue",
     category: "google",
+    hasClassName: false,
+  },
+  // Popular CapCut/剪映 style fonts (using web-safe alternatives)
+  {
+    value: "system-ui",
+    label: "System UI",
+    category: "system",
+    hasClassName: false,
+  },
+  {
+    value: "monospace",
+    label: "Monospace",
+    category: "system",
+    hasClassName: false,
+  },
+  {
+    value: "serif",
+    label: "Serif",
+    category: "system",
+    hasClassName: false,
+  },
+  {
+    value: "sans-serif",
+    label: "Sans Serif",
+    category: "system",
+    hasClassName: false,
+  },
+  {
+    value: "cursive",
+    label: "Cursive",
+    category: "system",
+    hasClassName: false,
+  },
+  {
+    value: "fantasy",
+    label: "Fantasy",
+    category: "system",
     hasClassName: false,
   },
 ] as const;

@@ -36,8 +36,15 @@ export interface TextElement extends BaseTimelineElement {
   y: number; // Position relative to canvas center
   rotation: number; // in degrees
   opacity: number; // 0-1
-  // AI and animation properties
+  // Advanced text styling
   textShadow?: string;
+  letterSpacing?: number; // in pixels
+  lineHeight?: number; // multiplier (1.0 = normal)
+  textStroke?: {
+    width: number; // stroke width in pixels
+    color: string; // stroke color
+  };
+  // AI and animation properties
   animation?: {
     type: string;
     duration: number;

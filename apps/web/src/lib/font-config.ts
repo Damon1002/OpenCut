@@ -24,6 +24,15 @@ export const FONT_CLASS_MAP = {
   Helvetica: "",
   "Times New Roman": "",
   Georgia: "",
+  "Courier New": "",
+  Impact: "",
+  Verdana: "",
+  "system-ui": "",
+  monospace: "",
+  serif: "",
+  "sans-serif": "",
+  cursive: "",
+  fantasy: "",
 } as const;
 
 // Export individual fonts for use in layout

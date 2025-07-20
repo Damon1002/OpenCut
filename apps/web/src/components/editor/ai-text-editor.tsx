@@ -15,9 +15,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Wand2, Palette, Play, Loader2, X } from "lucide-react";
+import { Sparkles, Wand2, Palette, Play, Loader2, X, Shield, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useTokenUsage } from "@/stores/token-usage-store";
+import { TokenUsageProgress } from "@/components/ui/progress-bar";
 
 interface AITextEditorProps {
   isOpen: boolean;
@@ -28,11 +30,13 @@ interface AITextEditorProps {
 }
 
 const ANIMATION_PRESETS = [
-  { name: "Fade In", value: "fadeIn", description: "Smooth fade in with scale" },
-  { name: "Slide In", value: "slideIn", description: "Slide in from left" },
-  { name: "Bounce", value: "bounce", description: "Bouncy entrance" },
+  { name: "Fade In", value: "fadeIn", description: "Smooth fade in with gentle scale" },
+  { name: "Slide In", value: "slideIn", description: "Smooth slide in from left" },
+  { name: "Bounce", value: "bounce", description: "Elastic bounce entrance" },
   { name: "Typewriter", value: "typewriter", description: "Letter by letter reveal" },
-  { name: "Glow", value: "glow", description: "Glowing text effect" },
+  { name: "Glow", value: "glow", description: "Smooth glowing text effect" },
+  { name: "Zoom In", value: "zoomIn", description: "Scale up with bounce" },
+  { name: "Rotate In", value: "rotateIn", description: "Rotate into position" },
 ];
 
 const STYLE_SUGGESTIONS = [
@@ -60,15 +64,28 @@ export function AITextEditor({
   const [generatedStyles, setGeneratedStyles] = useState<any[]>([]);
   const [selectedAnimation, setSelectedAnimation] = useState("");
   const [aiApiKey, setAiApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isKeyValidated, setIsKeyValidated] = useState(false);
+  const { usedTokens, tokenLimit, addTokenUsage, canUseTokens, getUsagePercentage } = useTokenUsage();
   const modalRef = useRef<HTMLDivElement>(null);
 
 // Initialize security and load API key
 useEffect(() => {
   (async () => {
-    await secureKeyManager.initialize();
-    const savedApiKey = await secureKeyManager.getApiKey("google-ai");
-    if (savedApiKey) {
-      setAiApiKey(savedApiKey);
+    try {
+      console.log('Initializing SecureKeyManager...');
+      await secureKeyManager.initialize();
+      console.log('SecureKeyManager initialized successfully');
+      
+      const savedApiKey = await secureKeyManager.getApiKey("google-ai");
+      if (savedApiKey) {
+        console.log('Loaded existing API key from secure storage');
+        setAiApiKey(savedApiKey);
+        setIsKeyValidated(true);
+      }
+    } catch (error) {
+      console.error('Failed to initialize security manager:', error);
+      toast.error('Security initialization failed. Please refresh the page.');
     }
   })();
 }, []);
@@ -78,21 +95,54 @@ type ApiKeyType = 'google-ai' | 'openai' | 'anthropic';
 
 const handleApiKeySave = async () => {
   try {
-    if (!secureKeyManager.validateApiKey(aiApiKey as string, 'google-ai')) {
-      toast.error("Invalid API key format");
+    // Trim whitespace
+    const trimmedKey = aiApiKey.trim();
+    
+    if (!trimmedKey) {
+      toast.error("API key cannot be empty");
+      return;
+    }
+    
+    // Validate API key format
+    if (!secureKeyManager.validateApiKey(trimmedKey, 'google-ai')) {
+      toast.error("Invalid Google AI API key format. Please check your key.");
       return;
     }
 
-    await secureKeyManager.storeApiKey("google-ai", aiApiKey as string);
-    toast.success("API key saved securely");
+    // Test the API key by making a small request
+    setIsLoading(true);
+    try {
+      const genAI = new GoogleGenerativeAI(trimmedKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      
+      // Test with a minimal prompt to verify the key works
+      await model.generateContent("Hello");
+      
+      // If successful, store the key
+      await secureKeyManager.storeApiKey("google-ai", trimmedKey);
+      setIsKeyValidated(true);
+      toast.success("API key validated and saved securely");
+    } catch (apiError) {
+      console.error("API key validation failed:", apiError);
+      toast.error("API key is invalid or has insufficient permissions");
+    } finally {
+      setIsLoading(false);
+    }
   } catch (error) {
     console.error("Failed to save API key securely", error);
     toast.error("Failed to save API key securely");
+    setIsLoading(false);
   }
 };
 
-  // Generate styles using Google AI
+  // Generate styles using Google AI (token-optimized)
   const generateStyles = async () => {
+    console.log('🎨 Starting token-optimized style generation...');
+    console.log('Current element:', element);
+    console.log('Current track:', track);
+    console.log('API key available:', !!aiApiKey);
+    console.log('Prompt:', prompt);
+    
     if (!aiApiKey) {
       toast.error("Please enter your Google AI API key");
       return;
@@ -103,60 +153,134 @@ const handleApiKeySave = async () => {
       return;
     }
 
+    // Estimate token usage for this operation - much smaller now!
+    const estimatedTokens = 35; // Much more efficient approach
+    
+    if (!canUseTokens(estimatedTokens)) {
+      toast.error(`Insufficient tokens. Need ${estimatedTokens} tokens but only ${tokenLimit - usedTokens} remaining.`);
+      return;
+    }
+
     setIsLoading(true);
     try {
+      console.log('🤖 Initializing Google AI for style selection...');
       const genAI = new GoogleGenerativeAI(aiApiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        generationConfig: {
+          temperature: 0.5,
+          maxOutputTokens: 150,
+        }
+      });
 
-      const systemPrompt = `You are a text styling assistant for a video editor. Given a text element and a style description, generate CSS-like styling options that can be applied to text. The current text is: "${element.content}".
+      // Token-efficient approach: Ask AI to select and modify existing presets
+      const availableStyles = quickStyles.map(style => `${style.name}: ${JSON.stringify(style.style)}`);
+      
+      const systemPrompt = `Based on "${prompt}" for text "${element.content}", choose the best style from these options and suggest 1-2 modifications:
 
-Current styles:
-- Font size: ${element.fontSize}px
-- Font family: ${element.fontFamily}
-- Color: ${element.color}
-- Background: ${element.backgroundColor}
-- Text align: ${element.textAlign}
-- Font weight: ${element.fontWeight}
-- Font style: ${element.fontStyle}
-- Text decoration: ${element.textDecoration}
+${availableStyles.join('\n')}
 
-Generate 3 different styling variations based on this request: "${prompt}"
+Respond with ONLY: styleName|modification1=value1|modification2=value2
 
-Return ONLY a JSON array with this exact structure:
-[
-  {
-    "name": "Style Name",
-    "description": "Brief description",
-    "fontSize": 48,
-    "fontFamily": "Arial",
-    "color": "#ffffff",
-    "backgroundColor": "transparent",
-    "textAlign": "center",
-    "fontWeight": "bold",
-    "fontStyle": "normal",
-    "textDecoration": "none",
-    "textShadow": "0 0 10px rgba(255,255,255,0.5)",
-    "opacity": 1
-  }
-]
+Example: Neon Glow|color=#ff00ff|textShadow=0 0 25px #ff00ff`;
 
-Make sure all color values are valid hex codes, fontSize is a number, and all other values match the expected format.`;
-
+      console.log('📝 Sending optimized prompt to AI:', systemPrompt);
       const result = await model.generateContent(systemPrompt);
       const response = result.response;
-      const text = response.text();
+      const text = response.text().trim();
       
-      // Extract JSON from the response
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        const styles = JSON.parse(jsonMatch[0]);
-        setGeneratedStyles(styles);
+      console.log('🎯 Raw AI response:', text);
+      
+      // Track token usage
+      addTokenUsage(estimatedTokens);
+      
+      // Parse the AI response
+      const parts = text.split('|');
+      if (parts.length >= 1) {
+        const styleName = parts[0].trim();
+        const baseStyle = quickStyles.find(s => s.name.toLowerCase().includes(styleName.toLowerCase()));
+        
+        if (baseStyle) {
+          // Create modified styles based on AI suggestions
+          const modifiedStyles = [];
+          
+          // Original style
+          modifiedStyles.push({
+            name: `${baseStyle.name} (Original)`,
+            description: `Original ${baseStyle.name} style`,
+            ...baseStyle.style
+          });
+          
+          // AI-modified version
+          const modifiedStyle = { ...baseStyle.style };
+          
+          // Apply modifications suggested by AI
+          for (let i = 1; i < parts.length; i++) {
+            const modification = parts[i].trim();
+            if (modification.includes('=')) {
+              const [prop, value] = modification.split('=');
+              const property = prop.trim();
+              const newValue = value.trim();
+              
+              // Apply the modification
+              if (property === 'fontSize') {
+                modifiedStyle.fontSize = parseInt(newValue) || modifiedStyle.fontSize;
+              } else if (property === 'color') {
+                modifiedStyle.color = newValue;
+              } else if (property === 'textShadow') {
+                modifiedStyle.textShadow = newValue;
+              } else if (property === 'fontWeight') {
+                modifiedStyle.fontWeight = newValue;
+              }
+            }
+          }
+          
+          modifiedStyles.push({
+            name: `${baseStyle.name} (AI Enhanced)`,
+            description: `AI-enhanced ${baseStyle.name} based on your request`,
+            ...modifiedStyle
+          });
+          
+          // Add a third variation with different intensity
+          const intensifiedStyle = { ...modifiedStyle };
+          if (intensifiedStyle.textShadow && intensifiedStyle.textShadow.includes('px')) {
+            // Increase glow intensity
+            intensifiedStyle.textShadow = intensifiedStyle.textShadow.replace(/\d+px/g, (match) => {
+              const num = parseInt(match);
+              return `${Math.min(num * 1.5, 50)}px`;
+            });
+          }
+          if (intensifiedStyle.fontSize) {
+            intensifiedStyle.fontSize = Math.min(intensifiedStyle.fontSize * 1.2, 80);
+          }
+          
+          modifiedStyles.push({
+            name: `${baseStyle.name} (Intense)`,
+            description: `Intensified version with enhanced effects`,
+            ...intensifiedStyle
+          });
+          
+          setGeneratedStyles(modifiedStyles);
+          console.log('🎨 Generated token-efficient styles:', modifiedStyles);
+          toast.success(`Generated 3 style variations using only ${estimatedTokens} tokens!`);
+        } else {
+          throw new Error("Could not find matching base style");
+        }
       } else {
-        throw new Error("Invalid response format");
+        throw new Error("Invalid AI response format");
       }
     } catch (error) {
-      console.error("Error generating styles:", error);
-      toast.error("Failed to generate styles. Please check your API key and try again.");
+      console.error("❌ Error generating styles:", error);
+      if (error.message.includes('API_KEY')) {
+        toast.error("Invalid API key. Please check your Google AI Studio API key.");
+        setIsKeyValidated(false);
+      } else if (error.message.includes('PERMISSION_DENIED')) {
+        toast.error("API key doesn't have sufficient permissions.");
+      } else if (error.message.includes('QUOTA_EXCEEDED')) {
+        toast.error("Google AI quota exceeded. Please try again later.");
+      } else {
+        toast.error(`Failed to generate styles: ${error.message}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -164,20 +288,52 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
 
   // Apply generated style
   const applyStyle = (style: any) => {
+    console.log('🎨 Applying style:', style);
+    console.log('📍 Track ID:', track.id);
+    console.log('📍 Element ID:', element.id);
+    console.log('📍 Current element before update:', element);
+    
     const updates: Partial<TextElement> = {};
     
-    if (style.fontSize) updates.fontSize = style.fontSize;
-    if (style.fontFamily) updates.fontFamily = style.fontFamily;
-    if (style.color) updates.color = style.color;
-    if (style.backgroundColor) updates.backgroundColor = style.backgroundColor;
-    if (style.textAlign) updates.textAlign = style.textAlign;
-    if (style.fontWeight) updates.fontWeight = style.fontWeight;
-    if (style.fontStyle) updates.fontStyle = style.fontStyle;
-    if (style.textDecoration) updates.textDecoration = style.textDecoration;
-    if (style.opacity !== undefined) updates.opacity = style.opacity;
+    // Handle all possible style properties with proper type casting
+    if (style.fontSize !== undefined) updates.fontSize = Number(style.fontSize);
+    if (style.fontFamily) updates.fontFamily = String(style.fontFamily);
+    if (style.color) updates.color = String(style.color);
+    if (style.backgroundColor) updates.backgroundColor = String(style.backgroundColor);
+    if (style.textAlign) updates.textAlign = style.textAlign as "left" | "center" | "right";
+    if (style.fontWeight) updates.fontWeight = style.fontWeight as "normal" | "bold";
+    if (style.fontStyle) updates.fontStyle = style.fontStyle as "normal" | "italic";
+    if (style.textDecoration) updates.textDecoration = style.textDecoration as "none" | "underline" | "line-through";
+    if (style.opacity !== undefined) updates.opacity = Number(style.opacity);
+    
+    // Add textShadow support - now properly typed
+    if (style.textShadow) {
+      updates.textShadow = String(style.textShadow);
+    }
 
-    updateTextElement(track.id, element.id, updates);
-    toast.success(`Applied ${style.name} style`);
+    console.log('🔄 Updates to apply:', updates);
+    console.log('🔄 Type of updates:', typeof updates);
+    console.log('🔄 Updates keys:', Object.keys(updates));
+    
+    try {
+      console.log('🚀 Calling updateTextElement...');
+      updateTextElement(track.id, element.id, updates);
+      console.log('✅ updateTextElement called successfully');
+      
+      // Log the timeline store state after update
+      const timelineState = useTimelineStore.getState();
+      console.log('📊 Timeline state after update:', timelineState.tracks);
+      
+      const updatedTrack = timelineState.tracks.find(t => t.id === track.id);
+      const updatedElement = updatedTrack?.elements.find(e => e.id === element.id);
+      console.log('📊 Updated element after store update:', updatedElement);
+      
+      toast.success(`Applied ${style.name} style`);
+    } catch (error) {
+      console.error('❌ Error applying style:', error);
+      console.error('❌ Error stack:', error.stack);
+      toast.error(`Failed to apply ${style.name} style`);
+    }
   };
 
   // Quick style presets
@@ -243,8 +399,51 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
   // Handle animation trigger
   const handleAnimationTrigger = (animation: string) => {
     setSelectedAnimation(animation);
+    
+    // Save the animation to the timeline element for automatic playback
+    // Using settings similar to CapCut/剪映
+    const animationConfig = {
+      type: animation,
+      duration: 0.8, // Shorter duration like CapCut (0.8s default)
+      delay: 0, // No delay by default, animation starts immediately when text appears
+      easing: getAnimationEasing(animation)
+    };
+    
+    updateTextElement(track.id, element.id, {
+      animation: animationConfig
+    });
+    
+    // Dispatch custom event to trigger animation immediately in the preview
+    const animationEvent = new CustomEvent('triggerTextAnimation', {
+      detail: {
+        elementId: element.id,
+        trackId: track.id,
+        animation: animation
+      }
+    });
+    window.dispatchEvent(animationEvent);
+    
+    // Also call the passed handler for backward compatibility
     onAnimationTrigger(animation);
-    toast.success(`Playing ${animation} animation`);
+    toast.success(`Applied ${animation} animation - it will play once when text appears during timeline playback`);
+  };
+
+  // Get appropriate easing for each animation type like CapCut/剪映
+  const getAnimationEasing = (animationType: string): string => {
+    switch (animationType) {
+      case 'fadeIn':
+        return 'power2.out'; // Smooth fade
+      case 'slideIn':
+        return 'back.out(1.2)'; // Slight overshoot like CapCut
+      case 'bounce':
+        return 'bounce.out'; // Natural bounce
+      case 'typewriter':
+        return 'none'; // Linear for typewriter effect
+      case 'glow':
+        return 'power2.inOut'; // Smooth glow transition
+      default:
+        return 'power2.out';
+    }
   };
 
   if (!isOpen) return null;
@@ -441,7 +640,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                 <CardHeader>
                   <CardTitle>Text Animations</CardTitle>
                   <CardDescription>
-                    Choose from various entrance animations powered by GSAP
+                    Apply entrance animations to your selected text element using GSAP
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -463,7 +662,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                           className="ml-4"
                         >
                           <Play className="h-4 w-4 mr-2" />
-                          Preview
+                          Apply Animation
                         </Button>
                       </div>
                     ))}
@@ -473,6 +672,28 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-6">
+              {/* Token Usage Display */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Token Usage
+                  </CardTitle>
+                  <CardDescription>
+                    Monitor your AI token consumption
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TokenUsageProgress 
+                    used={usedTokens} 
+                    limit={tokenLimit} 
+                    showDetails={true}
+                    size="lg"
+                  />
+                </CardContent>
+              </Card>
+
+              {/* API Configuration */}
               <Card>
                 <CardHeader>
                   <CardTitle>API Configuration</CardTitle>
@@ -483,18 +704,54 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="apiKeySettings">Google AI API Key</Label>
-                    <Input
-                      id="apiKeySettings"
-                      type="password"
-                      placeholder="Enter your API key"
-                      value={aiApiKey}
-                      onChange={(e) => setAiApiKey(e.target.value)}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="apiKeySettings"
+                        type={showApiKey ? "text" : "password"}
+                        placeholder="Enter your API key (e.g., AIzaSy...)"
+                        value={aiApiKey}
+                        onChange={(e) => setAiApiKey(e.target.value)}
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                      >
+                        {showApiKey ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    {isKeyValidated && (
+                      <div className="flex items-center gap-2 text-sm text-green-600">
+                        <Shield className="h-4 w-4" />
+                        API key is valid and secure
+                      </div>
+                    )}
                   </div>
-                  <Button onClick={handleApiKeySave}>
-                    Save API Key
+                  <Button 
+                    onClick={handleApiKeySave} 
+                    disabled={isLoading}
+                    className="w-full"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Validating...
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="mr-2 h-4 w-4" />
+                        Save API Key Securely
+                      </>
+                    )}
                   </Button>
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-sm text-muted-foreground space-y-2">
                     <p>
                       Get your API key from{" "}
                       <a
@@ -506,6 +763,15 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                         Google AI Studio
                       </a>
                     </p>
+                    <div className="bg-muted p-3 rounded-lg text-xs">
+                      <p className="font-medium mb-1">🔒 Security Features:</p>
+                      <ul className="space-y-1">
+                        <li>• API keys are encrypted using AES-256-GCM</li>
+                        <li>• Keys are validated before storage</li>
+                        <li>• Never stored in plain text or committed to git</li>
+                        <li>• Automatic security event logging</li>
+                      </ul>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

@@ -142,11 +142,23 @@ class SecureKeyManager {
     }
 
     try {
+      console.log('Starting to store API key securely...');
+      
+      // Check if encryption key is ready
+      if (!this.encryptionKey) {
+        console.log('Encryption key not ready, reinitializing...');
+        await this.generateEncryptionKey();
+      }
+      
       // Encrypt the API key
+      console.log('Encrypting API key...');
       const encryptedKey = await this.encrypt(apiKey);
+      console.log('API key encrypted successfully');
       
       // Store encrypted key in localStorage
+      console.log('Storing encrypted key in localStorage...');
       localStorage.setItem(this.STORAGE_PREFIX + keyName, encryptedKey);
+      console.log('API key stored in localStorage');
       
       // Store decrypted key in memory for immediate use
       this.decryptedKeys.set(keyName, apiKey);
@@ -154,11 +166,16 @@ class SecureKeyManager {
       // Log security event
       this.logSecurityEvent('api_key_stored', keyName);
       
-      toast.success('API key stored securely');
+      console.log('API key storage completed successfully');
+      // Don't show toast here - let the calling component handle it
     } catch (error) {
       console.error('Failed to store API key:', error);
-      toast.error('Failed to store API key securely');
-      throw error;
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      throw error; // Re-throw for the calling component to handle
     }
   }
 
@@ -260,9 +277,19 @@ class SecureKeyManager {
     }
 
     // Basic format validation based on key type
+    const trimmedKey = apiKey.trim();
+    
     switch (keyType) {
       case 'google-ai':
-        return apiKey.length > 20 && apiKey.includes('-');
+        // Google AI Studio API keys can have various formats:
+        // - AIzaSy... (most common format)
+        // - Can be 39+ characters long
+        // - Usually starts with AIzaSy but can have other patterns
+        return trimmedKey.length >= 20 && 
+               /^[A-Za-z0-9_-]+$/.test(trimmedKey) && 
+               (trimmedKey.startsWith('AIzaSy') || 
+                trimmedKey.startsWith('AI') || 
+                trimmedKey.length >= 30); // Fallback for other formats
       case 'openai':
         return apiKey.startsWith('sk-') && apiKey.length > 40;
       case 'anthropic':

@@ -60,6 +60,7 @@ import {
 import { Slider } from "../ui/slider";
 import TimelineCanvasRuler from "./timeline-canvas/timeline-canvas-ruler";
 import TimelineCanvasRulerWrapper from "./timeline-canvas/timeline-canvas-ruler-wrapper";
+import { AnimationMarkers } from "./animation-markers";
 
 export function Timeline() {
   // Timeline shows all tracks (video, audio, effects) and their elements.
@@ -569,6 +570,7 @@ export function Timeline() {
     <div
       className={`h-full flex flex-col transition-colors duration-200 relative bg-panel rounded-sm overflow-hidden`}
       {...dragProps}
+      data-timeline-area
       onMouseEnter={() => setIsInTimeline(true)}
       onMouseLeave={() => setIsInTimeline(false)}
     >
@@ -920,6 +922,13 @@ export function Timeline() {
                         </ContextMenuContent>
                       </ContextMenu>
                     ))}
+                    
+                    {/* Animation Markers */}
+                    <AnimationMarkers
+                      zoomLevel={zoomLevel}
+                      dynamicTimelineWidth={dynamicTimelineWidth}
+                      tracks={tracks}
+                    />
                   </>
                 )}
               </div>

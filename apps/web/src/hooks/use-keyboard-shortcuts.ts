@@ -52,7 +52,10 @@ export const useKeyboardShortcuts = (
       activeElement &&
       (activeElement.tagName === "INPUT" ||
         activeElement.tagName === "TEXTAREA" ||
-        activeElement.contentEditable === "true")
+        activeElement.contentEditable === "true") &&
+      !activeElement.classList.contains('timeline-element') &&
+      !activeElement.closest('.timeline') &&
+      !activeElement.closest('[data-timeline-area]')
     );
   }, []);
 
@@ -298,7 +301,17 @@ export const useKeyboardShortcuts = (
   // Handle keyboard events
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (!enabled || isInputFocused()) return;
+      if (!enabled) return;
+      
+      // Special handling for space bar - always allow it unless typing in inputs
+      if (e.key === ' ' || e.code === 'Space') {
+        if (isInputFocused()) return;
+        e.preventDefault();
+        toggle();
+        return;
+      }
+      
+      if (isInputFocused()) return;
 
       const keyCombo = parseKeyboardEvent(e);
       const shortcut = shortcuts.find((s) =>
@@ -319,7 +332,7 @@ export const useKeyboardShortcuts = (
         shortcut.action();
       }
     },
-    [enabled, shortcuts, selectedElements, parseKeyboardEvent, isInputFocused]
+    [enabled, shortcuts, selectedElements, parseKeyboardEvent, isInputFocused, toggle]
   );
 
   // Set up event listener
