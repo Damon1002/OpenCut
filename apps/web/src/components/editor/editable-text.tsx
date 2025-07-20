@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
 import { TextElement, TimelineTrack } from "@/types/timeline";
 import { useTimelineStore } from "@/stores/timeline-store";
+import { usePlaybackStore } from "@/stores/playback-store";
 import { FONT_CLASS_MAP } from "@/lib/font-config";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ export function EditableText({
   previewRef: externalPreviewRef,
 }: EditableTextProps) {
   const { updateTextElement, selectElement } = useTimelineStore();
+  const { isPlaying } = usePlaybackStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -249,8 +251,14 @@ export function EditableText({
     
     setIsAnimating(true);
     const tl = gsap.timeline({
-      onComplete: () => setIsAnimating(false)
+      onComplete: () => {
+        setIsAnimating(false);
+        setCurrentGSAPTimeline(null);
+      }
     });
+    
+    // Store the timeline reference for pause/resume control
+    setCurrentGSAPTimeline(tl);
 
     switch (animation) {
       case 'fadeIn':
@@ -341,19 +349,37 @@ export function EditableText({
     };
   }, [element.id, track.id, playAnimation]);
 
-  // Track animation state per element to ensure one-time playback like CapCut/剪映
-  const [hasAnimationPlayed, setHasAnimationPlayed] = useState(false);
-  const [lastElementStartTime, setLastElementStartTime] = useState(element.startTime);
+  // Track animation state and timing for replay functionality
+  const [lastPlaybackTime, setLastPlaybackTime] = useState(-1);
+  const [animationTriggered, setAnimationTriggered] = useState(false);
+  const [currentGSAPTimeline, setCurrentGSAPTimeline] = useState<gsap.core.Timeline | null>(null);
 
-  // Reset animation state when element timing changes
+  // Reset animation state when animation type changes
+  const [lastAnimationType, setLastAnimationType] = useState(element.animation?.type);
   useEffect(() => {
-    if (element.startTime !== lastElementStartTime) {
-      setHasAnimationPlayed(false);
-      setLastElementStartTime(element.startTime);
+    const currentAnimationType = element.animation?.type;
+    if (currentAnimationType !== lastAnimationType) {
+      console.log(`🔄 Animation type changed from ${lastAnimationType} to ${currentAnimationType}, resetting animation state`);
+      setAnimationTriggered(false);
+      setIsAnimating(false);
+      setLastAnimationType(currentAnimationType);
     }
-  }, [element.startTime, lastElementStartTime]);
+  }, [element.animation?.type, lastAnimationType]);
 
-  // Synchronize animations with timeline playback - play once like CapCut/剪映
+  // Control GSAP timeline pause/resume based on playback state
+  useEffect(() => {
+    if (currentGSAPTimeline) {
+      if (isPlaying) {
+        console.log(`▶️ Resuming GSAP animation for element ${element.id}`);
+        currentGSAPTimeline.resume();
+      } else {
+        console.log(`⏸️ Pausing GSAP animation for element ${element.id}`);
+        currentGSAPTimeline.pause();
+      }
+    }
+  }, [isPlaying, currentGSAPTimeline, element.id]);
+
+  // Synchronize animations with timeline playback - trigger every time playback crosses animation marker
   useEffect(() => {
     // Only trigger automatic animations if the element has an animation property
     if (!element.animation) return;
@@ -365,28 +391,27 @@ export function EditableText({
       const elementStart = element.startTime;
       const elementEnd = element.startTime + (element.duration - element.trimStart - element.trimEnd);
       
-      // Check if playhead is just entering this text element's timeframe
-      if (currentTime >= elementStart && currentTime < elementEnd) {
-        // Calculate relative time within the element (0 to element duration)
-        const relativeTime = currentTime - elementStart;
-        const animationStart = element.animation.delay || 0;
-        
-        // Only trigger animation if:
-        // 1. We're at or past the animation start time
-        // 2. Animation hasn't been played yet for this element instance
-        // 3. Not already animating
-        // 4. We're within a reasonable window to ensure it only plays when element first appears (like CapCut/剪映)
-        if (relativeTime >= animationStart && 
-            !hasAnimationPlayed && 
-            !isAnimating && 
-            relativeTime <= animationStart + 0.2) {
-          console.log(`🎬 Auto-triggering ${element.animation.type} animation for element ${element.id} (CapCut-style one-time play)`);
-          setHasAnimationPlayed(true);
-          playAnimation(element.animation.type);
-        }
-      } else if (currentTime < elementStart) {
-        // Reset animation state if playhead goes before element start
-        setHasAnimationPlayed(false);
+      // Calculate animation trigger time
+      const animationTriggerTime = elementStart + (element.animation.delay || 0);
+      
+      // Check if we just crossed the animation trigger point
+      const crossedTrigger = lastPlaybackTime < animationTriggerTime && currentTime >= animationTriggerTime;
+      
+      // Update last playback time
+      setLastPlaybackTime(currentTime);
+      
+      // Trigger animation if:
+      // 1. We just crossed the animation trigger time (forward playback)
+      // 2. We're within the element's timeframe
+      // 3. Timeline is playing
+      // 4. Not already animating
+      if (crossedTrigger &&
+          currentTime >= elementStart &&
+          currentTime < elementEnd &&
+          isPlaying &&
+          !isAnimating) {
+        console.log(`🎬 Animation triggered for element ${element.id} at time ${currentTime.toFixed(2)}s (trigger: ${animationTriggerTime.toFixed(2)}s)`);
+        playAnimation(element.animation.type);
       }
     };
 
@@ -394,25 +419,21 @@ export function EditableText({
       const { time: currentTime } = event.detail;
       const elementStart = element.startTime;
       const elementEnd = element.startTime + (element.duration - element.trimStart - element.trimEnd);
+      const animationTriggerTime = elementStart + (element.animation.delay || 0);
       
       // Reset animation state when seeking
       setIsAnimating(false);
       
-      // If we seek before the element start, reset animation played state
-      if (currentTime < elementStart) {
-        setHasAnimationPlayed(false);
-      }
-      // If we seek to within the element's animation trigger window, play animation
-      else if (currentTime >= elementStart && currentTime < elementEnd && element.animation && !hasAnimationPlayed) {
-        const relativeTime = currentTime - elementStart;
-        const animationStart = element.animation.delay || 0;
-        
-        // Play animation if we seek past the animation start time
-        if (relativeTime >= animationStart) {
-          console.log(`🎬 Seek-triggering ${element.animation.type} animation for element ${element.id}`);
-          setHasAnimationPlayed(true);
-          setTimeout(() => playAnimation(element.animation!.type), 100); // Small delay to ensure state is reset
-        }
+      // Update last playback time to current seek position
+      setLastPlaybackTime(currentTime);
+      
+      // If we seek to a position past the animation trigger within the element, play animation immediately
+      if (currentTime >= animationTriggerTime && 
+          currentTime >= elementStart && 
+          currentTime < elementEnd && 
+          element.animation) {
+        console.log(`🎬 Seek-triggering ${element.animation.type} animation for element ${element.id}`);
+        setTimeout(() => playAnimation(element.animation!.type), 100); // Small delay to ensure state is reset
       }
     };
 
@@ -424,7 +445,7 @@ export function EditableText({
       window.removeEventListener('playback-update', handlePlaybackUpdate as EventListener);
       window.removeEventListener('playback-seek', handlePlaybackSeek as EventListener);
     };
-  }, [element.id, element.startTime, element.duration, element.trimStart, element.trimEnd, element.animation, playAnimation, isAnimating, hasAnimationPlayed]);
+  }, [element.id, element.startTime, element.duration, element.trimStart, element.trimEnd, element.animation, playAnimation, isAnimating, lastPlaybackTime, isPlaying]);
 
   const fontClassName = FONT_CLASS_MAP[element.fontFamily as keyof typeof FONT_CLASS_MAP] || "";
 
@@ -491,7 +512,7 @@ export function EditableText({
                 fontWeight: element.fontWeight,
                 fontStyle: element.fontStyle,
                 textDecoration: element.textDecoration,
-                textShadow: element.textShadow || (element.content === "hello this is damon" ? "0 0 20px #00ff00, 0 0 30px #00ff00, 0 0 40px #00ff00" : undefined),
+                textShadow: element.textShadow,
                 letterSpacing: element.letterSpacing ? `${element.letterSpacing}px` : undefined,
                 lineHeight: element.lineHeight || undefined,
                 WebkitTextStroke: element.textStroke ? `${element.textStroke.width}px ${element.textStroke.color}` : undefined,

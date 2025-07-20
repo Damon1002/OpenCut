@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Wand2, Play, Loader2, RotateCcw, Paperclip, X, Image as ImageIcon } from "lucide-react";
+import { Sparkles, Wand2, Play, Loader2, RotateCcw, Paperclip, X, Image as ImageIcon, Star } from "lucide-react";
 import { toast } from "sonner";
 
 interface AITextPropertiesProps {
@@ -22,14 +22,45 @@ interface AITextPropertiesProps {
   onAnimationTrigger: (animation: string) => void;
 }
 
-const ANIMATION_PRESETS = [
-  { name: "Fade In", value: "fadeIn", description: "Smooth fade in with gentle scale" },
-  { name: "Slide In", value: "slideIn", description: "Smooth slide in from left" },
-  { name: "Bounce", value: "bounce", description: "Elastic bounce entrance" },
-  { name: "Typewriter", value: "typewriter", description: "Letter by letter reveal" },
-  { name: "Glow", value: "glow", description: "Smooth glowing text effect" },
-  { name: "Zoom In", value: "zoomIn", description: "Scale up with bounce" },
-  { name: "Rotate In", value: "rotateIn", description: "Rotate into position" },
+// Animation presets organized by categories like CapCut
+// Note: Using exact animation names that match editable-text.tsx implementation
+const ENTRANCE_ANIMATIONS = [
+  { name: "Fade In", value: "fadeIn", description: "Smooth fade in with gentle scale", category: "in" },
+  { name: "Slide In", value: "slideIn", description: "Smooth slide in from left", category: "in" },
+  { name: "Bounce", value: "bounce", description: "Elastic bounce entrance", category: "in" },
+  { name: "Zoom In", value: "zoomIn", description: "Scale up with bounce", category: "in" },
+  { name: "Rotate In", value: "rotateIn", description: "Rotate into position", category: "in" },
+  { name: "Typewriter", value: "typewriter", description: "Letter by letter reveal", category: "in" },
+  { name: "Glow", value: "glow", description: "Glowing text effect", category: "in" },
+];
+
+const EXIT_ANIMATIONS = [
+  { name: "Fade Out", value: "fadeOut", description: "Smooth fade out", category: "out" },
+  { name: "Slide Out", value: "slideOut", description: "Slide out to right", category: "out" },
+  { name: "Bounce Out", value: "bounceOut", description: "Elastic bounce exit", category: "out" },
+  { name: "Zoom Out", value: "zoomOut", description: "Scale down and disappear", category: "out" },
+  { name: "Rotate Out", value: "rotateOut", description: "Rotate and fade out", category: "out" },
+];
+
+const LOOP_ANIMATIONS = [
+  { name: "Pulse", value: "pulse", description: "Gentle pulsing effect", category: "loop" },
+  { name: "Wobble", value: "wobble", description: "Subtle wobble animation", category: "loop" },
+  { name: "Float", value: "float", description: "Floating up and down", category: "loop" },
+  { name: "Shake", value: "shake", description: "Gentle shake effect", category: "loop" },
+];
+
+const DEFAULT_ANIMATIONS = [
+  { name: "Bounce", value: "bounce", description: "Popular elastic bounce entrance", category: "default", isDefault: true },
+  { name: "Typewriter", value: "typewriter", description: "Letter-by-letter reveal effect", category: "default", isDefault: true },
+  { name: "Glow Effect", value: "glow", description: "Glowing text animation", category: "default", isDefault: true },
+];
+
+
+// All animations combined
+const ALL_ANIMATIONS = [
+  ...ENTRANCE_ANIMATIONS,
+  ...EXIT_ANIMATIONS, 
+  ...LOOP_ANIMATIONS
 ];
 
 const STYLE_SUGGESTIONS = [
@@ -56,6 +87,8 @@ export function AITextProperties({
   const [attachedImage, setAttachedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+  const [selectedAnimationCategory, setSelectedAnimationCategory] = useState<'star' | 'all' | 'in' | 'out' | 'loop'>('star');
+  const [savedAnimations, setSavedAnimations] = useState<any[]>([]);
 
   // Initialize security and load API key
   useEffect(() => {
@@ -528,6 +561,44 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
     }
   };
 
+  // Save animation to favorites
+  const toggleSaveAnimation = (animation: any) => {
+    const isSaved = savedAnimations.some(saved => saved.value === animation.value);
+    
+    if (isSaved) {
+      // Remove from saved
+      setSavedAnimations(prev => prev.filter(saved => saved.value !== animation.value));
+      toast.success(`Removed ${animation.name} from favorites`);
+    } else {
+      // Add to saved
+      setSavedAnimations(prev => [...prev, { ...animation, isSaved: true }]);
+      toast.success(`Saved ${animation.name} to favorites`);
+    }
+  };
+
+  // Check if animation is saved
+  const isAnimationSaved = (animationValue: string) => {
+    return savedAnimations.some(saved => saved.value === animationValue);
+  };
+
+  // Get animations for selected category
+  const getAnimationsForCategory = () => {
+    switch (selectedAnimationCategory) {
+      case 'star':
+        return [...DEFAULT_ANIMATIONS, ...savedAnimations];
+      case 'all':
+        return ALL_ANIMATIONS;
+      case 'in':
+        return ENTRANCE_ANIMATIONS;
+      case 'out':
+        return EXIT_ANIMATIONS;
+      case 'loop':
+        return LOOP_ANIMATIONS;
+      default:
+        return DEFAULT_ANIMATIONS;
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
@@ -741,28 +812,81 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
             <CardHeader>
               <CardTitle className="text-sm">Text Animations</CardTitle>
               <CardDescription className="text-xs">
-                Choose entrance animations for your text
+                Choose animations for your text like CapCut
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Category tabs */}
-              <div className="flex gap-2 mb-4">
-                <Button variant="outline" size="sm" className="text-xs h-7 bg-primary/10 text-primary border-primary/20">
-                  入场 (Entrance)
+              {/* CapCut-style Category tabs */}
+              <div className="flex gap-1 mb-4">
+                {/* Star category - default and saved animations */}
+                <Button 
+                  variant={selectedAnimationCategory === 'star' ? 'default' : 'ghost'}
+                  size="sm" 
+                  className={`text-xs h-8 px-3 ${
+                    selectedAnimationCategory === 'star' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setSelectedAnimationCategory('star')}
+                >
+                  <Star className="h-3 w-3 mr-1" />
+                  {selectedAnimationCategory === 'star' ? 'Default' : ''}
                 </Button>
-                <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground">
-                  出场 (Exit)
+                
+                {/* All category */}
+                <Button 
+                  variant={selectedAnimationCategory === 'all' ? 'default' : 'ghost'}
+                  size="sm" 
+                  className={`text-xs h-8 px-3 ${
+                    selectedAnimationCategory === 'all' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setSelectedAnimationCategory('all')}
+                >
+                  All
                 </Button>
-                <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground">
-                  循环 (Loop)
+                
+                {/* In category */}
+                <Button 
+                  variant={selectedAnimationCategory === 'in' ? 'default' : 'ghost'}
+                  size="sm" 
+                  className={`text-xs h-8 px-3 ${
+                    selectedAnimationCategory === 'in' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setSelectedAnimationCategory('in')}
+                >
+                  In
+                </Button>
+                
+                {/* Out category */}
+                <Button 
+                  variant={selectedAnimationCategory === 'out' ? 'default' : 'ghost'}
+                  size="sm" 
+                  className={`text-xs h-8 px-3 ${
+                    selectedAnimationCategory === 'out' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setSelectedAnimationCategory('out')}
+                >
+                  Out
+                </Button>
+                
+                {/* Loop category */}
+                <Button 
+                  variant={selectedAnimationCategory === 'loop' ? 'default' : 'ghost'}
+                  size="sm" 
+                  className={`text-xs h-8 px-3 ${
+                    selectedAnimationCategory === 'loop' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setSelectedAnimationCategory('loop')}
+                >
+                  Loop
                 </Button>
               </div>
 
-              {/* Animation grid */}
-              <div className="grid grid-cols-2 gap-3">
-                {ANIMATION_PRESETS.map((animation) => {
+              {/* Animation grid based on selected category */}
+              <div className="grid grid-cols-3 gap-2">
+                {getAnimationsForCategory().map((animation) => {
                   // Check if this animation is currently applied to the element
                   const isApplied = element.animation?.type === animation.value;
+                  const isSaved = isAnimationSaved(animation.value);
+                  const isInStarCategory = selectedAnimationCategory === 'star';
                   
                   return (
                     <div
@@ -775,76 +899,95 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                             : "border-border hover:border-accent-foreground hover:bg-accent/50"
                         }
                       `}
-                      onClick={() => {
-                        if (isApplied) {
-                          // Remove animation if already applied
-                          updateTextElement(track.id, element.id, {
-                            animation: undefined
-                          });
-                          toast.success(`Removed ${animation.name} animation`);
-                        } else {
-                          // Apply new animation
-                          handleAnimationTrigger(animation.value);
-                        }
-                      }}
                     >
-                      {/* Preview area */}
-                      <div className="h-20 bg-gradient-to-br from-muted/30 to-muted/60 flex items-center justify-center relative overflow-hidden">
+                      {/* Preview area - reduced height */}
+                      <div className="h-12 bg-gradient-to-br from-muted/30 to-muted/60 flex items-center justify-center relative overflow-hidden"
+                           onClick={() => {
+                             if (isApplied) {
+                               // Remove animation if already applied
+                               updateTextElement(track.id, element.id, {
+                                 animation: undefined
+                               });
+                               toast.success(`Removed ${animation.name} animation`);
+                             } else {
+                               // Apply new animation
+                               handleAnimationTrigger(animation.value);
+                             }
+                           }}
+                      >
                         {/* Animated preview text */}
                         <div 
                           className={`
-                            text-lg font-bold transition-all duration-700 relative z-10
+                            text-xs font-bold transition-all duration-700 relative z-10
                             ${
-                              animation.value === 'fadeIn' ? 'animate-pulse' :
-                              animation.value === 'slideIn' ? 'transform transition-transform group-hover:translate-x-1' :
-                              animation.value === 'bounce' ? 'animate-bounce' :
+                              animation.value === 'fadeIn' || animation.value === 'fadeOut' ? 'animate-pulse' :
+                              animation.value === 'slideIn' || animation.value === 'slideOut' ? 'transform transition-transform group-hover:translate-x-1' :
+                              animation.value === 'bounce' || animation.value === 'bounceOut' ? 'animate-bounce' :
                               animation.value === 'typewriter' ? 'font-mono' :
-                              animation.value === 'glow' ? 'text-yellow-400 animate-pulse' :
-                              animation.value === 'zoomIn' ? 'group-hover:scale-110 transition-transform' :
-                              animation.value === 'rotateIn' ? 'group-hover:rotate-12 transition-transform' :
+                              animation.value === 'glow' || animation.value === 'pulse' ? 'text-yellow-400 animate-pulse' :
+                              animation.value === 'zoomIn' || animation.value === 'zoomOut' ? 'group-hover:scale-110 transition-transform' :
+                              animation.value === 'rotateIn' || animation.value === 'rotateOut' ? 'group-hover:rotate-12 transition-transform' :
+                              animation.value === 'wobble' ? 'animate-bounce' :
+                              animation.value === 'float' ? 'animate-pulse' :
+                              animation.value === 'shake' ? 'group-hover:animate-bounce' :
                               ''
                             }
                           `}
                           style={{
-                            textShadow: animation.value === 'glow' ? '0 0 10px currentColor' : undefined
+                            textShadow: animation.value === 'glow' || animation.value === 'pulse' ? '0 0 8px currentColor' : undefined
                           }}
                         >
-                          ABC
+                          Aa
                         </div>
                         
-                        {/* Premium indicator */}
+                        {/* Applied indicator */}
                         {isApplied && (
-                          <div className="absolute top-1.5 right-1.5">
+                          <div className="absolute top-1 right-1">
                             <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
                           </div>
                         )}
                         
-                        {/* Download/Apply indicator */}
-                        <div className="absolute bottom-1.5 right-1.5">
-                          <div className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${
-                            isApplied ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/20 text-muted-foreground'
-                          }`}>
-                            {isApplied ? '✓' : '↓'}
-                          </div>
-                        </div>
-                        
                         {/* Background animation effect */}
-                        <div className={`absolute inset-0 opacity-20 ${
-                          animation.value === 'fadeIn' ? 'bg-gradient-to-r from-transparent via-white to-transparent' :
-                          animation.value === 'slideIn' ? 'bg-gradient-to-r from-blue-500 to-transparent' :
-                          animation.value === 'bounce' ? 'bg-gradient-to-t from-green-500/30 to-transparent' :
-                          animation.value === 'glow' ? 'bg-radial-gradient from-yellow-400/30 to-transparent' :
-                          animation.value === 'zoomIn' ? 'bg-gradient-to-br from-purple-500/30 to-transparent' :
-                          'bg-gradient-to-br from-gray-400/20 to-transparent'
+                        <div className={`absolute inset-0 opacity-10 ${
+                          animation.category === 'in' ? 'bg-gradient-to-r from-green-400/20 to-transparent' :
+                          animation.category === 'out' ? 'bg-gradient-to-l from-red-400/20 to-transparent' :
+                          animation.category === 'loop' ? 'bg-gradient-to-br from-blue-400/20 to-transparent' :
+                          animation.category === 'default' ? 'bg-gradient-to-br from-yellow-400/20 to-transparent' :
+                          'bg-gradient-to-br from-gray-400/10 to-transparent'
                         }`} />
                       </div>
                       
-                      {/* Label */}
-                      <div className="p-2 text-center">
-                        <div className={`text-xs font-medium ${
+                      {/* Label and Star section - reduced padding */}
+                      <div className="flex items-center justify-between px-1 py-1">
+                        <div className={`text-[10px] font-medium flex-1 text-center ${
                           isApplied ? 'text-primary' : 'text-foreground'
                         }`}>
                           {animation.name}
+                        </div>
+                        
+                        {/* Star icon for save/unsave - larger and more visible */}
+                        <div 
+                          className="flex-shrink-0 p-1 rounded hover:bg-accent/50 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isInStarCategory && animation.isSaved) {
+                              // In star category, clicking star on saved animation removes it
+                              toggleSaveAnimation(animation);
+                            } else if (!animation.isDefault) {
+                              // Outside star category, clicking star saves/unsaves the animation
+                              toggleSaveAnimation(animation);
+                            }
+                          }}
+                        >
+                          {animation.isDefault ? (
+                            <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                          ) : (
+                            <Star className={`h-4 w-4 transition-colors ${
+                              isSaved 
+                                ? 'text-yellow-500 fill-yellow-500 hover:text-yellow-600'
+                                : 'text-gray-400 hover:text-yellow-500'
+                            }`} />
+                          )}
                         </div>
                       </div>
                       

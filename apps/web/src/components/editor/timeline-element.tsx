@@ -426,20 +426,6 @@ export function TimelineElement({
               {renderElementContent()}
             </div>
 
-            {/* Animation Markers */}
-            {element.type === "text" && element.animation && (
-              <div
-                className="absolute top-1 left-1 z-50 pointer-events-none"
-                title={`Animation: ${element.animation.type} (${element.animation.duration}s)`}
-              >
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-                  <span className="text-xs font-medium text-blue-400 bg-black/70 px-1 py-0.5 rounded text-[10px] leading-none">
-                    {element.animation.type}
-                  </span>
-                </div>
-              </div>
-            )}
 
             {isSelected && (
               <>
