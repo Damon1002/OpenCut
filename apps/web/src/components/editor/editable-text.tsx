@@ -41,6 +41,8 @@ export function EditableText({
   const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
   const [initialFontSize, setInitialFontSize] = useState(element.fontSize);
   const [initialRotation, setInitialRotation] = useState(element.rotation);
+  const [isResizingWidth, setIsResizingWidth] = useState(false);
+  const [initialWidth, setInitialWidth] = useState(element.maxWidth || 'auto');
   
   const elementRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -199,6 +201,46 @@ export function EditableText({
     document.addEventListener('mouseup', handleMouseUp);
   }, [element.rotation, track.id, element.id, updateTextElement]);
 
+  // Handle width adjustment (left and right handles)
+  const handleWidthMouseDown = useCallback((e: React.MouseEvent, side: 'left' | 'right') => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setIsResizingWidth(true);
+    setInitialWidth(element.maxWidth || 300); // Default width if not set
+    
+    const elementRect = elementRef.current?.getBoundingClientRect();
+    if (!elementRect) return;
+    
+    const startX = e.clientX;
+    const initialWidthPx = element.maxWidth || 300;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - startX;
+      let newWidth: number;
+      
+      if (side === 'right') {
+        newWidth = initialWidthPx + deltaX;
+      } else {
+        newWidth = initialWidthPx - deltaX;
+      }
+      
+      // Clamp width between 50px and 800px
+      newWidth = Math.max(50, Math.min(800, newWidth));
+      
+      updateTextElement(track.id, element.id, { maxWidth: newWidth });
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizingWidth(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [element.maxWidth, track.id, element.id, updateTextElement]);
+
   // Click outside to deselect
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -249,9 +291,23 @@ export function EditableText({
   const playAnimation = useCallback((animation: string) => {
     if (!gsapRef.current || isAnimating) return;
     
+    // Get dynamic duration from animation config, fallback to default values
+    const animationDuration = element.animation?.duration || 0.8;
+    
     setIsAnimating(true);
     const tl = gsap.timeline({
       onComplete: () => {
+        // Handle animation category-specific completion behavior
+        const animationType = element.animation?.type;
+        if (animationType) {
+          // "in" animations should remain visible after completion
+          // "out" animations should hide or fade the element
+          // "loop" animations should repeat
+          if (isOutAnimation(animationType)) {
+            // For out animations, keep the final state
+            gsapRef.current!.style.opacity = '0';
+          }
+        }
         setIsAnimating(false);
         setCurrentGSAPTimeline(null);
       }
@@ -260,23 +316,33 @@ export function EditableText({
     // Store the timeline reference for pause/resume control
     setCurrentGSAPTimeline(tl);
 
+    // Reset only transform-related properties to preserve text styling
+    gsap.set(gsapRef.current, {
+      x: 0,
+      y: 0,
+      rotation: 0,
+      scale: 1,
+      opacity: 1,
+      transformOrigin: "center center"
+    });
+    
     switch (animation) {
       case 'fadeIn':
         tl.fromTo(gsapRef.current, 
           { opacity: 0, scale: 0.9 },
-          { opacity: 1, scale: 1, duration: 0.8, ease: "power2.out" }
+          { opacity: 1, scale: 1, duration: animationDuration, ease: "power2.out" }
         );
         break;
       case 'slideIn':
         tl.fromTo(gsapRef.current,
           { x: -80, opacity: 0 },
-          { x: 0, opacity: 1, duration: 0.7, ease: "power3.out" }
+          { x: 0, opacity: 1, duration: animationDuration, ease: "power3.out" }
         );
         break;
       case 'bounce':
         tl.fromTo(gsapRef.current,
           { y: -30, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.8, ease: "elastic.out(1, 0.5)" }
+          { y: 0, opacity: 1, duration: animationDuration, ease: "elastic.out(1, 0.5)" }
         );
         break;
       case 'typewriter':
@@ -298,19 +364,22 @@ export function EditableText({
         // Make container visible again (spans are still invisible)
         gsapRef.current.style.opacity = '1';
         
+        // Calculate per-character timing based on total duration
+        const charDelay = animationDuration / chars.length;
+        
         // Animate each character appearing with proper timeline
         chars.forEach((char, i) => {
           tl.to(gsapRef.current!.children[i], {
             opacity: 1,
-            duration: 0.08,
+            duration: charDelay * 0.8, // Character appears for 80% of its allocated time
             ease: "power1.out"
-          }, i * 0.08);
+          }, i * charDelay);
         });
         break;
       case 'glow':
         tl.to(gsapRef.current, {
           textShadow: "0 0 15px #fff, 0 0 25px #fff, 0 0 35px #fff",
-          duration: 0.5,
+          duration: animationDuration / 2,
           ease: "power2.inOut",
           yoyo: true,
           repeat: 1
@@ -319,17 +388,133 @@ export function EditableText({
       case 'zoomIn':
         tl.fromTo(gsapRef.current,
           { scale: 0.5, opacity: 0 },
-          { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(1.2)" }
+          { scale: 1, opacity: 1, duration: animationDuration, ease: "back.out(1.2)" }
         );
         break;
       case 'rotateIn':
         tl.fromTo(gsapRef.current,
           { rotation: -90, opacity: 0, transformOrigin: "center center" },
-          { rotation: 0, opacity: 1, duration: 0.7, ease: "power2.out" }
+          { rotation: 0, opacity: 1, duration: animationDuration, ease: "power2.out" }
         );
         break;
+        
+      // EXIT ANIMATIONS
+      case 'fadeOut':
+        tl.to(gsapRef.current, {
+          opacity: 0,
+          scale: 0.9,
+          duration: animationDuration,
+          ease: "power2.in"
+        });
+        break;
+      case 'slideOut':
+        tl.to(gsapRef.current, {
+          x: 80,
+          opacity: 0,
+          duration: animationDuration,
+          ease: "power3.in"
+        });
+        break;
+      case 'bounceOut':
+        tl.to(gsapRef.current, {
+          y: -30,
+          opacity: 0,
+          duration: animationDuration,
+          ease: "elastic.in(1, 0.5)"
+        });
+        break;
+      case 'zoomOut':
+        tl.to(gsapRef.current, {
+          scale: 0.5,
+          opacity: 0,
+          duration: animationDuration,
+          ease: "back.in(1.2)"
+        });
+        break;
+      case 'rotateOut':
+        tl.to(gsapRef.current, {
+          rotation: 90,
+          opacity: 0,
+          duration: animationDuration,
+          ease: "power2.in",
+          transformOrigin: "center center"
+        });
+        break;
+        
+      // LOOP ANIMATIONS
+      case 'pulse':
+        tl.to(gsapRef.current, {
+          scale: 1.05,
+          duration: animationDuration,
+          ease: "power2.inOut",
+          yoyo: true,
+          repeat: -1
+        });
+        break;
+      case 'wobble':
+        // Store the current transform to maintain it during wobble
+        // Calculate individual step duration based on total animation duration
+        const wobbleStepDuration = animationDuration / 5; // 5 steps in wobble animation
+        const currentTransform = gsap.getProperty(gsapRef.current, "transform");
+        tl.to(gsapRef.current, {
+          rotation: "+=3", // Relative rotation to preserve existing rotation
+          duration: wobbleStepDuration,
+          ease: "power2.inOut"
+        })
+        .to(gsapRef.current, {
+          rotation: "-=6", // Relative rotation
+          duration: wobbleStepDuration,
+          ease: "power2.inOut"
+        })
+        .to(gsapRef.current, {
+          rotation: "+=6",
+          duration: wobbleStepDuration,
+          ease: "power2.inOut"
+        })
+        .to(gsapRef.current, {
+          rotation: "-=6",
+          duration: wobbleStepDuration,
+          ease: "power2.inOut"
+        })
+        .to(gsapRef.current, {
+          rotation: "+=3", // Return to starting position
+          duration: wobbleStepDuration,
+          ease: "power2.inOut"
+        });
+        break;
+      case 'float':
+        tl.to(gsapRef.current, {
+          y: "-=10", // Relative movement to preserve existing position
+          duration: animationDuration,
+          ease: "power2.inOut",
+          yoyo: true,
+          repeat: -1
+        });
+        break;
+      case 'shake':
+        tl.to(gsapRef.current, {
+          x: "+=2", // Relative movement to preserve existing position
+          duration: animationDuration / 6, // 6 total movements (5 repeats + 1 original)
+          ease: "power2.inOut",
+          yoyo: true,
+          repeat: 5
+        });
+        break;
     }
-  }, [element.content, isAnimating]);
+  }, [element.content, isAnimating, element.animation?.duration]);
+
+  // Helper function to determine animation category
+  const isInAnimation = (animationType: string): boolean => {
+    return ['fadeIn', 'slideIn', 'bounce', 'zoomIn', 'rotateIn', 'typewriter', 'glow'].includes(animationType);
+  };
+
+  const isOutAnimation = (animationType: string): boolean => {
+    return ['fadeOut', 'slideOut', 'bounceOut', 'zoomOut', 'rotateOut'].includes(animationType);
+  };
+
+  const isLoopAnimation = (animationType: string): boolean => {
+    return ['pulse', 'wobble', 'float', 'shake'].includes(animationType);
+  };
 
   // Listen for animation trigger events and playback synchronization
   useEffect(() => {
@@ -391,8 +576,26 @@ export function EditableText({
       const elementStart = element.startTime;
       const elementEnd = element.startTime + (element.duration - element.trimStart - element.trimEnd);
       
-      // Calculate animation trigger time
-      const animationTriggerTime = elementStart + (element.animation.delay || 0);
+      const animationType = element.animation.type;
+      
+      // Calculate animation trigger times based on category
+      let animationTriggerTime: number;
+      
+      if (isInAnimation(animationType)) {
+        // "In" animations trigger at the start of the element
+        animationTriggerTime = elementStart + (element.animation.delay || 0);
+      } else if (isOutAnimation(animationType)) {
+        // "Out" animations trigger near the end of the element
+        const animationDuration = element.animation.duration || 0.8;
+        animationTriggerTime = elementEnd - animationDuration - (element.animation.delay || 0);
+      } else if (isLoopAnimation(animationType)) {
+        // "Loop" animations trigger after "in" animations would complete
+        const inAnimationBuffer = 1.0; // Allow time for entrance animations
+        animationTriggerTime = elementStart + inAnimationBuffer + (element.animation.delay || 0);
+      } else {
+        // Default behavior (treat as "in" animation)
+        animationTriggerTime = elementStart + (element.animation.delay || 0);
+      }
       
       // Check if we just crossed the animation trigger point
       const crossedTrigger = lastPlaybackTime < animationTriggerTime && currentTime >= animationTriggerTime;
@@ -410,7 +613,7 @@ export function EditableText({
           currentTime < elementEnd &&
           isPlaying &&
           !isAnimating) {
-        console.log(`🎬 Animation triggered for element ${element.id} at time ${currentTime.toFixed(2)}s (trigger: ${animationTriggerTime.toFixed(2)}s)`);
+        console.log(`🎬 ${animationType} animation triggered for element ${element.id} at time ${currentTime.toFixed(2)}s (trigger: ${animationTriggerTime.toFixed(2)}s)`);
         playAnimation(element.animation.type);
       }
     };
@@ -419,10 +622,49 @@ export function EditableText({
       const { time: currentTime } = event.detail;
       const elementStart = element.startTime;
       const elementEnd = element.startTime + (element.duration - element.trimStart - element.trimEnd);
-      const animationTriggerTime = elementStart + (element.animation.delay || 0);
+      
+      const animationType = element.animation.type;
+      
+      // Calculate animation trigger time based on category
+      let animationTriggerTime: number;
+      
+      if (isInAnimation(animationType)) {
+        animationTriggerTime = elementStart + (element.animation.delay || 0);
+      } else if (isOutAnimation(animationType)) {
+        const animationDuration = element.animation.duration || 0.8;
+        animationTriggerTime = elementEnd - animationDuration - (element.animation.delay || 0);
+      } else if (isLoopAnimation(animationType)) {
+        const inAnimationBuffer = 1.0;
+        animationTriggerTime = elementStart + inAnimationBuffer + (element.animation.delay || 0);
+      } else {
+        animationTriggerTime = elementStart + (element.animation.delay || 0);
+      }
       
       // Reset animation state when seeking
       setIsAnimating(false);
+      
+      // Stop any current GSAP timeline
+      if (currentGSAPTimeline) {
+        currentGSAPTimeline.kill();
+        setCurrentGSAPTimeline(null);
+      }
+      
+      // Reset element to default state (preserve text styling)
+      if (gsapRef.current) {
+        gsap.set(gsapRef.current, {
+          x: 0,
+          y: 0,
+          rotation: 0,
+          scale: 1,
+          opacity: 1,
+          transformOrigin: "center center",
+          textShadow: element.textShadow || "none"
+        });
+        // Restore original content for typewriter animations
+        if (gsapRef.current.innerHTML !== element.content) {
+          gsapRef.current.innerHTML = element.content;
+        }
+      }
       
       // Update last playback time to current seek position
       setLastPlaybackTime(currentTime);
@@ -493,9 +735,11 @@ export function EditableText({
                 textDecoration: element.textDecoration,
                 textAlign: element.textAlign,
                 minWidth: '100px',
+                maxWidth: element.maxWidth ? `${element.maxWidth}px` : undefined,
+                width: element.maxWidth ? `${element.maxWidth}px` : 'auto',
                 fontFamily: fontClassName === "" ? element.fontFamily : undefined,
               }}
-              rows={1}
+              rows={element.maxWidth ? undefined : 1}
               autoFocus
             />
           </motion.div>
@@ -518,7 +762,10 @@ export function EditableText({
                 WebkitTextStroke: element.textStroke ? `${element.textStroke.width}px ${element.textStroke.color}` : undefined,
                 padding: "4px 8px",
                 borderRadius: "2px",
-                whiteSpace: "nowrap",
+                whiteSpace: element.maxWidth ? "normal" : "nowrap",
+                wordWrap: element.maxWidth ? "break-word" : "normal",
+                maxWidth: element.maxWidth ? `${element.maxWidth}px` : undefined,
+                width: element.maxWidth ? `${element.maxWidth}px` : "auto",
                 fontFamily: fontClassName === "" ? element.fontFamily : undefined,
               }}
               onMouseEnter={() => {
@@ -552,6 +799,39 @@ export function EditableText({
                 >
                   {/* Selection border - White border like CapCut */}
                   <div className="absolute inset-0 border-2 border-white rounded-md pointer-events-none shadow-lg" />
+                  
+                  {/* Width adjustment handles */}
+                  <div className="absolute -left-3 top-1/2 -translate-y-1/2 group/width-left pointer-events-auto">
+                    <div
+                      className="w-6 h-6 bg-orange-500 border-2 border-white rounded-full cursor-ew-resize hover:bg-orange-600 transition-colors flex items-center justify-center shadow-lg"
+                      onMouseDown={(e) => handleWidthMouseDown(e, 'left')}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-white">
+                        <path d="M4 6H8M4 6L6 4M4 6L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    {/* Width tooltip */}
+                    <div className="absolute -top-12 -left-6 bg-black/90 text-white text-sm px-3 py-2 rounded-md opacity-0 group-hover/width-left:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none shadow-xl">
+                      Drag to adjust width
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/90" />
+                    </div>
+                  </div>
+                  
+                  <div className="absolute -right-3 top-1/2 -translate-y-1/2 group/width-right pointer-events-auto">
+                    <div
+                      className="w-6 h-6 bg-orange-500 border-2 border-white rounded-full cursor-ew-resize hover:bg-orange-600 transition-colors flex items-center justify-center shadow-lg"
+                      onMouseDown={(e) => handleWidthMouseDown(e, 'right')}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-white">
+                        <path d="M8 6H4M8 6L6 4M8 6L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    {/* Width tooltip */}
+                    <div className="absolute -top-12 -left-6 bg-black/90 text-white text-sm px-3 py-2 rounded-md opacity-0 group-hover/width-right:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none shadow-xl">
+                      Drag to adjust width
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/90" />
+                    </div>
+                  </div>
                   
                   {/* Font size handle (bottom-right) with larger tooltip */}
                   <div className="absolute -bottom-3 -right-3 group/resize pointer-events-auto">

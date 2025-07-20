@@ -13,8 +13,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Wand2, Play, Loader2, RotateCcw, Paperclip, X, Image as ImageIcon, Star } from "lucide-react";
+import { Sparkles, Wand2, Play, Loader2, RotateCcw, Paperclip, X, Image as ImageIcon, Star, Type } from "lucide-react";
 import { toast } from "sonner";
+import { Slider } from "@/components/ui/slider";
 
 interface AITextPropertiesProps {
   element: TextElement;
@@ -617,6 +618,39 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
           Reset Style
         </Button>
       </div>
+
+      {/* Font Size Slider */}
+      <Card className="mb-4">
+        <CardContent className="pt-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm flex items-center gap-2">
+                <Type className="h-4 w-4" />
+                Font Size
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  value={element.fontSize}
+                  onChange={(e) => setFontSize(parseInt(e.target.value) || 8)}
+                  className="w-16 h-6 text-xs"
+                  min={8}
+                  max={300}
+                />
+                <span className="text-xs text-muted-foreground">px</span>
+              </div>
+            </div>
+            <Slider
+              value={[element.fontSize]}
+              min={8}
+              max={300}
+              step={1}
+              onValueChange={(value) => setFontSize(value[0])}
+              className="w-full"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="style" className="w-full">
         <TabsList className="grid w-full grid-cols-3">

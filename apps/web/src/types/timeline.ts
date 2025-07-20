@@ -44,6 +44,8 @@ export interface TextElement extends BaseTimelineElement {
     width: number; // stroke width in pixels
     color: string; // stroke color
   };
+  // Text width and wrapping
+  maxWidth?: number; // Maximum width in pixels for text wrapping
   // AI and animation properties
   animation?: {
     type: string;
