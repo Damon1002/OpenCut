@@ -170,6 +170,12 @@ interface TimelineStore {
         | "y"
         | "rotation"
         | "opacity"
+        | "animation"
+        | "textShadow"
+        | "letterSpacing"
+        | "lineHeight"
+        | "textStroke"
+        | "maxWidth"
       >
     >
   ) => void;

@@ -170,11 +170,13 @@ class SecureKeyManager {
       // Don't show toast here - let the calling component handle it
     } catch (error) {
       console.error('Failed to store API key:', error);
-      console.error('Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+      }
       throw error; // Re-throw for the calling component to handle
     }
   }

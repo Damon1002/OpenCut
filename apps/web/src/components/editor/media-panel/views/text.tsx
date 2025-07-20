@@ -88,7 +88,6 @@ export function TextView() {
           useTimelineStore.getState().addTextAtTime(textData, currentTime)
         }
         showLabel={false}
-        onPlusClick={handleAddDefaultText}
       />
     </div>
   );

@@ -271,15 +271,16 @@ Example: Neon Glow|color=#ff00ff|textShadow=0 0 25px #ff00ff`;
       }
     } catch (error) {
       console.error("❌ Error generating styles:", error);
-      if (error.message.includes('API_KEY')) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('API_KEY')) {
         toast.error("Invalid API key. Please check your Google AI Studio API key.");
         setIsKeyValidated(false);
-      } else if (error.message.includes('PERMISSION_DENIED')) {
+      } else if (errorMessage.includes('PERMISSION_DENIED')) {
         toast.error("API key doesn't have sufficient permissions.");
-      } else if (error.message.includes('QUOTA_EXCEEDED')) {
+      } else if (errorMessage.includes('QUOTA_EXCEEDED')) {
         toast.error("Google AI quota exceeded. Please try again later.");
       } else {
-        toast.error(`Failed to generate styles: ${error.message}`);
+        toast.error(`Failed to generate styles: ${errorMessage}`);
       }
     } finally {
       setIsLoading(false);
@@ -331,7 +332,9 @@ Example: Neon Glow|color=#ff00ff|textShadow=0 0 25px #ff00ff`;
       toast.success(`Applied ${style.name} style`);
     } catch (error) {
       console.error('❌ Error applying style:', error);
-      console.error('❌ Error stack:', error.stack);
+      if (error instanceof Error) {
+        console.error('❌ Error stack:', error.stack);
+      }
       toast.error(`Failed to apply ${style.name} style`);
     }
   };
@@ -715,7 +718,7 @@ Example: Neon Glow|color=#ff00ff|textShadow=0 0 25px #ff00ff`;
                       />
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                         onClick={() => setShowApiKey(!showApiKey)}

@@ -611,7 +611,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
           <h3 className="text-lg font-semibold">AI Text Editor</h3>
         </div>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           onClick={resetToOriginalStyle}
           className="text-xs h-7 px-3 text-muted-foreground hover:text-foreground"
@@ -722,7 +722,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                     />
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => document.getElementById('image-attachment')?.click()}
                       className="h-6 w-6 p-0 hover:bg-accent"
@@ -743,7 +743,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                       Attached Image
                     </Label>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={removeAttachedImage}
                       className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
@@ -857,7 +857,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
               <div className="flex gap-1 mb-4">
                 {/* Star category - default and saved animations */}
                 <Button 
-                  variant={selectedAnimationCategory === 'star' ? 'default' : 'ghost'}
+                  variant={selectedAnimationCategory === 'star' ? 'default' : 'outline'}
                   size="sm" 
                   className={`text-xs h-8 px-3 ${
                     selectedAnimationCategory === 'star' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -870,7 +870,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                 
                 {/* All category */}
                 <Button 
-                  variant={selectedAnimationCategory === 'all' ? 'default' : 'ghost'}
+                  variant={selectedAnimationCategory === 'all' ? 'default' : 'outline'}
                   size="sm" 
                   className={`text-xs h-8 px-3 ${
                     selectedAnimationCategory === 'all' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -882,7 +882,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                 
                 {/* In category */}
                 <Button 
-                  variant={selectedAnimationCategory === 'in' ? 'default' : 'ghost'}
+                  variant={selectedAnimationCategory === 'in' ? 'default' : 'outline'}
                   size="sm" 
                   className={`text-xs h-8 px-3 ${
                     selectedAnimationCategory === 'in' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -894,7 +894,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                 
                 {/* Out category */}
                 <Button 
-                  variant={selectedAnimationCategory === 'out' ? 'default' : 'ghost'}
+                  variant={selectedAnimationCategory === 'out' ? 'default' : 'outline'}
                   size="sm" 
                   className={`text-xs h-8 px-3 ${
                     selectedAnimationCategory === 'out' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -906,7 +906,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                 
                 {/* Loop category */}
                 <Button 
-                  variant={selectedAnimationCategory === 'loop' ? 'default' : 'ghost'}
+                  variant={selectedAnimationCategory === 'loop' ? 'default' : 'outline'}
                   size="sm" 
                   className={`text-xs h-8 px-3 ${
                     selectedAnimationCategory === 'loop' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'

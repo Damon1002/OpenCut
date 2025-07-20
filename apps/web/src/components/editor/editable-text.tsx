@@ -518,8 +518,8 @@ export function EditableText({
             // Split the text into words
             const { words } = splitText(gsapRef.current);
             
-            // Animate the words with spring animation
-            animate(
+            // Animate the words with spring animation and store the animation reference
+            const motionAnimation = animate(
               words,
               { opacity: [0, 1], y: [10, 0] },
               {
@@ -527,8 +527,15 @@ export function EditableText({
                 duration: animationDuration,
                 bounce: 0,
                 delay: stagger(0.05),
+                onComplete: () => {
+                  setIsAnimating(false);
+                  setCurrentMotionAnimation(null);
+                }
               }
             );
+            
+            // Store the motion animation reference for pause/resume control
+            setCurrentMotionAnimation(motionAnimation);
           });
         }).catch(error => {
           console.error('Failed to load motion libraries for splitText animation:', error);
@@ -577,6 +584,7 @@ export function EditableText({
   const [lastPlaybackTime, setLastPlaybackTime] = useState(-1);
   const [animationTriggered, setAnimationTriggered] = useState(false);
   const [currentGSAPTimeline, setCurrentGSAPTimeline] = useState<gsap.core.Timeline | null>(null);
+  const [currentMotionAnimation, setCurrentMotionAnimation] = useState<any>(null);
 
   // Reset animation state when animation type changes
   const [lastAnimationType, setLastAnimationType] = useState(element.animation?.type);
@@ -590,7 +598,7 @@ export function EditableText({
     }
   }, [element.animation?.type, lastAnimationType]);
 
-  // Control GSAP timeline pause/resume based on playback state
+  // Control GSAP timeline and Motion animations pause/resume based on playback state
   useEffect(() => {
     if (currentGSAPTimeline) {
       if (isPlaying) {
@@ -601,7 +609,26 @@ export function EditableText({
         currentGSAPTimeline.pause();
       }
     }
-  }, [isPlaying, currentGSAPTimeline, element.id]);
+    
+    // Control Motion animations (splitText)
+    if (currentMotionAnimation) {
+      if (isPlaying) {
+        console.log(`▶️ Resuming Motion animation for element ${element.id}`);
+        // Motion animations don't have built-in pause/resume, but we can use play/pause methods if available
+        if (typeof currentMotionAnimation.play === 'function') {
+          currentMotionAnimation.play();
+        }
+      } else {
+        console.log(`⏸️ Pausing Motion animation for element ${element.id}`);
+        if (typeof currentMotionAnimation.pause === 'function') {
+          currentMotionAnimation.pause();
+        } else if (typeof currentMotionAnimation.stop === 'function') {
+          // If pause is not available, stop the animation
+          currentMotionAnimation.stop();
+        }
+      }
+    }
+  }, [isPlaying, currentGSAPTimeline, currentMotionAnimation, element.id]);
 
   // Synchronize animations with timeline playback - trigger every time playback crosses animation marker
   useEffect(() => {
@@ -615,25 +642,25 @@ export function EditableText({
       const elementStart = element.startTime;
       const elementEnd = element.startTime + (element.duration - element.trimStart - element.trimEnd);
       
-      const animationType = element.animation.type;
+      const animationType = element.animation?.type;
       
       // Calculate animation trigger times based on category
       let animationTriggerTime: number;
       
-      if (isInAnimation(animationType)) {
+      if (animationType && isInAnimation(animationType)) {
         // "In" animations trigger at the start of the element
-        animationTriggerTime = elementStart + (element.animation.delay || 0);
-      } else if (isOutAnimation(animationType)) {
+        animationTriggerTime = elementStart + (element.animation?.delay || 0);
+      } else if (animationType && isOutAnimation(animationType)) {
         // "Out" animations trigger near the end of the element
-        const animationDuration = element.animation.duration || 0.8;
-        animationTriggerTime = elementEnd - animationDuration - (element.animation.delay || 0);
-      } else if (isLoopAnimation(animationType)) {
+        const animationDuration = element.animation?.duration || 0.8;
+        animationTriggerTime = elementEnd - animationDuration - (element.animation?.delay || 0);
+      } else if (animationType && isLoopAnimation(animationType)) {
         // "Loop" animations trigger after "in" animations would complete
         const inAnimationBuffer = 1.0; // Allow time for entrance animations
-        animationTriggerTime = elementStart + inAnimationBuffer + (element.animation.delay || 0);
+        animationTriggerTime = elementStart + inAnimationBuffer + (element.animation?.delay || 0);
       } else {
         // Default behavior (treat as "in" animation)
-        animationTriggerTime = elementStart + (element.animation.delay || 0);
+        animationTriggerTime = elementStart + (element.animation?.delay || 0);
       }
       
       // Check if we just crossed the animation trigger point
@@ -653,7 +680,9 @@ export function EditableText({
           isPlaying &&
           !isAnimating) {
         console.log(`🎬 ${animationType} animation triggered for element ${element.id} at time ${currentTime.toFixed(2)}s (trigger: ${animationTriggerTime.toFixed(2)}s)`);
-        playAnimation(element.animation.type);
+        if (element.animation?.type) {
+          playAnimation(element.animation.type);
+        }
       }
     };
 
@@ -662,21 +691,21 @@ export function EditableText({
       const elementStart = element.startTime;
       const elementEnd = element.startTime + (element.duration - element.trimStart - element.trimEnd);
       
-      const animationType = element.animation.type;
+      const animationType = element.animation?.type;
       
       // Calculate animation trigger time based on category
       let animationTriggerTime: number;
       
-      if (isInAnimation(animationType)) {
-        animationTriggerTime = elementStart + (element.animation.delay || 0);
-      } else if (isOutAnimation(animationType)) {
-        const animationDuration = element.animation.duration || 0.8;
-        animationTriggerTime = elementEnd - animationDuration - (element.animation.delay || 0);
-      } else if (isLoopAnimation(animationType)) {
+      if (animationType && isInAnimation(animationType)) {
+        animationTriggerTime = elementStart + (element.animation?.delay || 0);
+      } else if (animationType && isOutAnimation(animationType)) {
+        const animationDuration = element.animation?.duration || 0.8;
+        animationTriggerTime = elementEnd - animationDuration - (element.animation?.delay || 0);
+      } else if (animationType && isLoopAnimation(animationType)) {
         const inAnimationBuffer = 1.0;
-        animationTriggerTime = elementStart + inAnimationBuffer + (element.animation.delay || 0);
+        animationTriggerTime = elementStart + inAnimationBuffer + (element.animation?.delay || 0);
       } else {
-        animationTriggerTime = elementStart + (element.animation.delay || 0);
+        animationTriggerTime = elementStart + (element.animation?.delay || 0);
       }
       
       // Reset animation state when seeking
@@ -686,6 +715,16 @@ export function EditableText({
       if (currentGSAPTimeline) {
         currentGSAPTimeline.kill();
         setCurrentGSAPTimeline(null);
+      }
+      
+      // Stop any current Motion animation
+      if (currentMotionAnimation) {
+        if (typeof currentMotionAnimation.stop === 'function') {
+          currentMotionAnimation.stop();
+        } else if (typeof currentMotionAnimation.pause === 'function') {
+          currentMotionAnimation.pause();
+        }
+        setCurrentMotionAnimation(null);
       }
       
       // Reset element to default state (preserve text styling)

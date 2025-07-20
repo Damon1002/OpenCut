@@ -128,7 +128,7 @@ export class VideoAIEngine {
       
       for (const group of grouped) {
         const combinedPrompt = this.createCombinedPrompt(group);
-        const cacheKey = this.generateCacheKey({ prompt: combinedPrompt, type: 'batch' });
+        const cacheKey = this.generateCacheKey({ prompt: combinedPrompt, type: 'enhance' });
         
         // Check cache first
         if (this.cache.has(cacheKey)) {
