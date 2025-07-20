@@ -207,13 +207,23 @@ export function EditableText({
     e.stopPropagation();
     
     setIsResizingWidth(true);
-    setInitialWidth(element.maxWidth || 300); // Default width if not set
+    
+    // If no maxWidth is set, initialize it based on current text width
+    let initialWidthPx = element.maxWidth;
+    if (!initialWidthPx) {
+      // Calculate initial width based on current rendered text width
+      const textRect = gsapRef.current?.getBoundingClientRect();
+      initialWidthPx = textRect ? Math.max(textRect.width, 200) : 300;
+      // Set the initial maxWidth to enable text wrapping
+      updateTextElement(track.id, element.id, { maxWidth: initialWidthPx });
+    }
+    
+    setInitialWidth(initialWidthPx);
     
     const elementRect = elementRef.current?.getBoundingClientRect();
     if (!elementRect) return;
     
     const startX = e.clientX;
-    const initialWidthPx = element.maxWidth || 300;
     
     const handleMouseMove = (e: MouseEvent) => {
       const deltaX = e.clientX - startX;

@@ -59,6 +59,7 @@ export function TextView() {
         isEditable: true,
         textShadow: undefined,
         animation: undefined,
+        maxWidth: undefined, // No width constraint by default - allows nowrap
       });
       
       toast.success("Text added to timeline");
