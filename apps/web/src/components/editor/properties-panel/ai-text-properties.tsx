@@ -741,33 +741,164 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
             <CardHeader>
               <CardTitle className="text-sm">Text Animations</CardTitle>
               <CardDescription className="text-xs">
-                Choose from various entrance animations
+                Choose entrance animations for your text
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {ANIMATION_PRESETS.map((animation) => (
-                  <div
-                    key={animation.value}
-                    className="flex items-center justify-between p-2 border rounded"
-                  >
-                    <div>
-                      <h4 className="font-medium text-xs">{animation.name}</h4>
-                      <p className="text-xs text-muted-foreground">
-                        {animation.description}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleAnimationTrigger(animation.value)}
-                      className="ml-2 h-6 text-xs"
-                      size="sm"
+              {/* Category tabs */}
+              <div className="flex gap-2 mb-4">
+                <Button variant="outline" size="sm" className="text-xs h-7 bg-primary/10 text-primary border-primary/20">
+                  入场 (Entrance)
+                </Button>
+                <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground">
+                  出场 (Exit)
+                </Button>
+                <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground">
+                  循环 (Loop)
+                </Button>
+              </div>
+
+              {/* Animation grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {ANIMATION_PRESETS.map((animation) => {
+                  // Check if this animation is currently applied to the element
+                  const isApplied = element.animation?.type === animation.value;
+                  
+                  return (
+                    <div
+                      key={animation.value}
+                      className={`
+                        relative bg-card border rounded-lg overflow-hidden cursor-pointer transition-all duration-200 group
+                        ${
+                          isApplied 
+                            ? "border-primary ring-2 ring-primary/20 bg-primary/5" 
+                            : "border-border hover:border-accent-foreground hover:bg-accent/50"
+                        }
+                      `}
+                      onClick={() => {
+                        if (isApplied) {
+                          // Remove animation if already applied
+                          updateTextElement(track.id, element.id, {
+                            animation: undefined
+                          });
+                          toast.success(`Removed ${animation.name} animation`);
+                        } else {
+                          // Apply new animation
+                          handleAnimationTrigger(animation.value);
+                        }
+                      }}
                     >
-                      <Play className="h-3 w-3 mr-1" />
-                      Apply Animation
-                    </Button>
+                      {/* Preview area */}
+                      <div className="h-20 bg-gradient-to-br from-muted/30 to-muted/60 flex items-center justify-center relative overflow-hidden">
+                        {/* Animated preview text */}
+                        <div 
+                          className={`
+                            text-lg font-bold transition-all duration-700 relative z-10
+                            ${
+                              animation.value === 'fadeIn' ? 'animate-pulse' :
+                              animation.value === 'slideIn' ? 'transform transition-transform group-hover:translate-x-1' :
+                              animation.value === 'bounce' ? 'animate-bounce' :
+                              animation.value === 'typewriter' ? 'font-mono' :
+                              animation.value === 'glow' ? 'text-yellow-400 animate-pulse' :
+                              animation.value === 'zoomIn' ? 'group-hover:scale-110 transition-transform' :
+                              animation.value === 'rotateIn' ? 'group-hover:rotate-12 transition-transform' :
+                              ''
+                            }
+                          `}
+                          style={{
+                            textShadow: animation.value === 'glow' ? '0 0 10px currentColor' : undefined
+                          }}
+                        >
+                          ABC
+                        </div>
+                        
+                        {/* Premium indicator */}
+                        {isApplied && (
+                          <div className="absolute top-1.5 right-1.5">
+                            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                          </div>
+                        )}
+                        
+                        {/* Download/Apply indicator */}
+                        <div className="absolute bottom-1.5 right-1.5">
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${
+                            isApplied ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/20 text-muted-foreground'
+                          }`}>
+                            {isApplied ? '✓' : '↓'}
+                          </div>
+                        </div>
+                        
+                        {/* Background animation effect */}
+                        <div className={`absolute inset-0 opacity-20 ${
+                          animation.value === 'fadeIn' ? 'bg-gradient-to-r from-transparent via-white to-transparent' :
+                          animation.value === 'slideIn' ? 'bg-gradient-to-r from-blue-500 to-transparent' :
+                          animation.value === 'bounce' ? 'bg-gradient-to-t from-green-500/30 to-transparent' :
+                          animation.value === 'glow' ? 'bg-radial-gradient from-yellow-400/30 to-transparent' :
+                          animation.value === 'zoomIn' ? 'bg-gradient-to-br from-purple-500/30 to-transparent' :
+                          'bg-gradient-to-br from-gray-400/20 to-transparent'
+                        }`} />
+                      </div>
+                      
+                      {/* Label */}
+                      <div className="p-2 text-center">
+                        <div className={`text-xs font-medium ${
+                          isApplied ? 'text-primary' : 'text-foreground'
+                        }`}>
+                          {animation.name}
+                        </div>
+                      </div>
+                      
+                      {/* Active overlay */}
+                      {isApplied && (
+                        <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
+                      )}
+                    </div>
+                  );
+                })}
+                
+                {/* No animation option */}
+                <div
+                  className={`
+                    relative bg-card border rounded-lg overflow-hidden cursor-pointer transition-all duration-200 group
+                    ${
+                      !element.animation 
+                        ? "border-primary ring-2 ring-primary/20 bg-primary/5" 
+                        : "border-border hover:border-accent-foreground hover:bg-accent/50"
+                    }
+                  `}
+                  onClick={() => {
+                    updateTextElement(track.id, element.id, {
+                      animation: undefined
+                    });
+                    toast.success('Removed all animations');
+                  }}
+                >
+                  {/* Preview area */}
+                  <div className="h-20 bg-gradient-to-br from-muted/30 to-muted/60 flex items-center justify-center relative">
+                    <div className="text-2xl text-muted-foreground">
+                      ⊘
+                    </div>
+                    {!element.animation && (
+                      <div className="absolute top-1.5 right-1.5">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                      </div>
+                    )}
                   </div>
-                ))}
+                  
+                  {/* Label */}
+                  <div className="p-2 text-center">
+                    <div className={`text-xs font-medium ${
+                      !element.animation ? 'text-primary' : 'text-foreground'
+                    }`}>
+                      None
+                    </div>
+                  </div>
+                  
+                  {/* Active overlay */}
+                  {!element.animation && (
+                    <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
