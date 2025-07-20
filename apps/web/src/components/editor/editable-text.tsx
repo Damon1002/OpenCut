@@ -500,12 +500,51 @@ export function EditableText({
           repeat: 5
         });
         break;
+      case 'splitText':
+        // Import motion functions dynamically since they're not in GSAP
+        import('motion').then(async ({ animate, stagger }) => {
+          const { splitText } = await import('motion-plus');
+          
+          // Hide the container initially
+          gsapRef.current!.style.visibility = 'hidden';
+          
+          // Wait for fonts to be ready
+          document.fonts.ready.then(() => {
+            if (!gsapRef.current) return;
+            
+            // Show the container
+            gsapRef.current.style.visibility = 'visible';
+            
+            // Split the text into words
+            const { words } = splitText(gsapRef.current);
+            
+            // Animate the words with spring animation
+            animate(
+              words,
+              { opacity: [0, 1], y: [10, 0] },
+              {
+                type: "spring",
+                duration: animationDuration,
+                bounce: 0,
+                delay: stagger(0.05),
+              }
+            );
+          });
+        }).catch(error => {
+          console.error('Failed to load motion libraries for splitText animation:', error);
+          // Fallback to simple fade in if motion libraries fail
+          tl.fromTo(gsapRef.current, 
+            { opacity: 0 },
+            { opacity: 1, duration: animationDuration, ease: "power2.out" }
+          );
+        });
+        break;
     }
   }, [element.content, isAnimating, element.animation?.duration]);
 
   // Helper function to determine animation category
   const isInAnimation = (animationType: string): boolean => {
-    return ['fadeIn', 'slideIn', 'bounce', 'zoomIn', 'rotateIn', 'typewriter', 'glow'].includes(animationType);
+    return ['fadeIn', 'slideIn', 'bounce', 'zoomIn', 'rotateIn', 'typewriter', 'glow', 'splitText'].includes(animationType);
   };
 
   const isOutAnimation = (animationType: string): boolean => {

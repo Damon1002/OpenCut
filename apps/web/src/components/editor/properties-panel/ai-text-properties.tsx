@@ -33,6 +33,7 @@ const ENTRANCE_ANIMATIONS = [
   { name: "Rotate In", value: "rotateIn", description: "Rotate into position", category: "in" },
   { name: "Typewriter", value: "typewriter", description: "Letter by letter reveal", category: "in" },
   { name: "Glow", value: "glow", description: "Glowing text effect", category: "in" },
+  { name: "Split Text", value: "splitText", description: "Word by word reveal with spring animation", category: "in" },
 ];
 
 const EXIT_ANIMATIONS = [
@@ -557,6 +558,8 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
         return 'none'; // Linear for typewriter effect
       case 'glow':
         return 'power2.inOut'; // Smooth glow transition
+      case 'splitText':
+        return 'spring'; // Spring animation for word reveals
       default:
         return 'power2.out';
     }
@@ -964,6 +967,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                               animation.value === 'wobble' ? 'animate-bounce' :
                               animation.value === 'float' ? 'animate-pulse' :
                               animation.value === 'shake' ? 'group-hover:animate-bounce' :
+                              animation.value === 'splitText' ? 'group-hover:animate-pulse' :
                               ''
                             }
                           `}
