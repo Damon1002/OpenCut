@@ -208,14 +208,15 @@ export function EditableText({
     
     setIsResizingWidth(true);
     
-    // If no maxWidth is set, initialize it based on current text width
+    // Calculate initial width - always get the current rendered text width
+    const textRect = gsapRef.current?.getBoundingClientRect();
     let initialWidthPx = element.maxWidth;
+    
+    // If no maxWidth is set, we need to establish a baseline
     if (!initialWidthPx) {
-      // Calculate initial width based on current rendered text width
-      const textRect = gsapRef.current?.getBoundingClientRect();
+      // Use current rendered width as the starting point
       initialWidthPx = textRect ? Math.max(textRect.width, 200) : 300;
-      // Set the initial maxWidth to enable text wrapping
-      updateTextElement(track.id, element.id, { maxWidth: initialWidthPx });
+      // Don't set maxWidth immediately - let the user drag to set it
     }
     
     setInitialWidth(initialWidthPx);
@@ -238,6 +239,7 @@ export function EditableText({
       // Clamp width between 50px and 800px
       newWidth = Math.max(50, Math.min(800, newWidth));
       
+      // Always set maxWidth when dragging (this enables text wrapping)
       updateTextElement(track.id, element.id, { maxWidth: newWidth });
     };
     
