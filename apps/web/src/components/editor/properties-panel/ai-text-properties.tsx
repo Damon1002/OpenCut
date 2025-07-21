@@ -402,17 +402,18 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
     toast.success("Text styling reset to original");
   };
   
-  // Handle animation trigger
+  // Handle animation trigger - optimized for better responsiveness
   const handleAnimationTrigger = (animation: string) => {
     // Save the animation to the timeline element for automatic playback
     // Using settings similar to CapCut/剪映
     const animationConfig = {
       type: animation,
-      duration: 0.8, // Shorter duration like CapCut (0.8s default)
+      duration: 0.6, // Slightly faster duration for better responsiveness
       delay: 0, // No delay by default, animation starts immediately when text appears
       easing: getAnimationEasing(animation)
     };
     
+    // Update element immediately for instant UI feedback
     updateTextElement(track.id, element.id, {
       animation: animationConfig
     });
@@ -427,9 +428,13 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
     });
     window.dispatchEvent(animationEvent);
     
-    // Also call the passed handler for backward compatibility
+    // Call the passed handler for backward compatibility
     onAnimationTrigger(animation);
-    toast.success(`Applied ${animation} animation - it will play once when text appears during timeline playback`);
+    
+    // Show success toast (but don't block the UI)
+    requestAnimationFrame(() => {
+      toast.success(`Applied ${animation} animation`);
+    });
   };
   
   // Make these functions globally accessible for AI commands
@@ -565,18 +570,24 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
     }
   };
 
-  // Save animation to favorites
+  // Save animation to favorites - optimized for better responsiveness
   const toggleSaveAnimation = (animation: any) => {
     const isSaved = savedAnimations.some(saved => saved.value === animation.value);
     
     if (isSaved) {
-      // Remove from saved
+      // Remove from saved immediately
       setSavedAnimations(prev => prev.filter(saved => saved.value !== animation.value));
-      toast.success(`Removed ${animation.name} from favorites`);
+      // Show toast asynchronously
+      requestAnimationFrame(() => {
+        toast.success(`Removed ${animation.name} from favorites`);
+      });
     } else {
-      // Add to saved
+      // Add to saved immediately
       setSavedAnimations(prev => [...prev, { ...animation, isSaved: true }]);
-      toast.success(`Saved ${animation.name} to favorites`);
+      // Show toast asynchronously
+      requestAnimationFrame(() => {
+        toast.success(`Saved ${animation.name} to favorites`);
+      });
     }
   };
 
@@ -929,17 +940,27 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                     <div
                       key={animation.value}
                       className={`
-                        relative bg-card border rounded-lg overflow-hidden cursor-pointer transition-all duration-200 group
+                        relative bg-card border rounded-lg overflow-hidden cursor-pointer transition-all duration-75 group select-none
                         ${
                           isApplied 
-                            ? "border-primary ring-2 ring-primary/20 bg-primary/5" 
-                            : "border-border hover:border-accent-foreground hover:bg-accent/50"
+                            ? "border-primary ring-1 ring-primary/20 bg-primary/5" 
+                            : "border-border hover:border-accent-foreground hover:bg-accent/30"
                         }
                       `}
                     >
-                      {/* Preview area - reduced height */}
-                      <div className="h-12 bg-gradient-to-br from-muted/30 to-muted/60 flex items-center justify-center relative overflow-hidden"
-                           onClick={() => {
+                      {/* Preview area - reduced height with faster transitions */}
+                      <div className="h-12 bg-gradient-to-br from-muted/20 to-muted/40 flex items-center justify-center relative overflow-hidden active:scale-[0.98] transition-transform duration-75"
+                           onClick={(e) => {
+                             e.preventDefault();
+                             e.stopPropagation();
+                             
+                             // Immediate visual feedback
+                             const target = e.currentTarget;
+                             target.style.transform = 'scale(0.95)';
+                             setTimeout(() => {
+                               target.style.transform = '';
+                             }, 100);
+                             
                              if (isApplied) {
                                // Remove animation if already applied
                                updateTextElement(track.id, element.id, {
@@ -952,62 +973,63 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                              }
                            }}
                       >
-                        {/* Animated preview text */}
+                        {/* Simplified animated preview text */}
                         <div 
                           className={`
-                            text-xs font-bold transition-all duration-700 relative z-10
+                            text-xs font-bold relative z-10
                             ${
-                              animation.value === 'fadeIn' || animation.value === 'fadeOut' ? 'animate-pulse' :
-                              animation.value === 'slideIn' || animation.value === 'slideOut' ? 'transform transition-transform group-hover:translate-x-1' :
-                              animation.value === 'bounce' || animation.value === 'bounceOut' ? 'animate-bounce' :
+                              animation.value === 'fadeIn' || animation.value === 'fadeOut' ? 'opacity-75' :
                               animation.value === 'typewriter' ? 'font-mono' :
-                              animation.value === 'glow' || animation.value === 'pulse' ? 'text-yellow-400 animate-pulse' :
-                              animation.value === 'zoomIn' || animation.value === 'zoomOut' ? 'group-hover:scale-110 transition-transform' :
-                              animation.value === 'rotateIn' || animation.value === 'rotateOut' ? 'group-hover:rotate-12 transition-transform' :
-                              animation.value === 'wobble' ? 'animate-bounce' :
-                              animation.value === 'float' ? 'animate-pulse' :
-                              animation.value === 'shake' ? 'group-hover:animate-bounce' :
-                              animation.value === 'splitText' ? 'group-hover:animate-pulse' :
+                              animation.value === 'glow' || animation.value === 'pulse' ? 'text-yellow-400' :
                               ''
                             }
                           `}
                           style={{
-                            textShadow: animation.value === 'glow' || animation.value === 'pulse' ? '0 0 8px currentColor' : undefined
+                            textShadow: animation.value === 'glow' || animation.value === 'pulse' ? '0 0 4px currentColor' : undefined
                           }}
                         >
                           Aa
                         </div>
                         
-                        {/* Applied indicator */}
+                        {/* Applied indicator with faster animation */}
                         {isApplied && (
                           <div className="absolute top-1 right-1">
-                            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                            <div className="w-1.5 h-1.5 bg-primary rounded-full" />
                           </div>
                         )}
                         
-                        {/* Background animation effect */}
-                        <div className={`absolute inset-0 opacity-10 ${
-                          animation.category === 'in' ? 'bg-gradient-to-r from-green-400/20 to-transparent' :
-                          animation.category === 'out' ? 'bg-gradient-to-l from-red-400/20 to-transparent' :
-                          animation.category === 'loop' ? 'bg-gradient-to-br from-blue-400/20 to-transparent' :
-                          animation.category === 'default' ? 'bg-gradient-to-br from-yellow-400/20 to-transparent' :
-                          'bg-gradient-to-br from-gray-400/10 to-transparent'
+                        {/* Simplified background effect */}
+                        <div className={`absolute inset-0 opacity-5 ${
+                          animation.category === 'in' ? 'bg-green-400' :
+                          animation.category === 'out' ? 'bg-red-400' :
+                          animation.category === 'loop' ? 'bg-blue-400' :
+                          animation.category === 'default' ? 'bg-yellow-400' :
+                          'bg-gray-400'
                         }`} />
                       </div>
                       
-                      {/* Label and Star section - reduced padding */}
+                      {/* Label and Star section - optimized for speed */}
                       <div className="flex items-center justify-between px-1 py-1">
-                        <div className={`text-[10px] font-medium flex-1 text-center ${
+                        <div className={`text-[10px] font-medium flex-1 text-center transition-colors duration-75 ${
                           isApplied ? 'text-primary' : 'text-foreground'
                         }`}>
                           {animation.name}
                         </div>
                         
-                        {/* Star icon for save/unsave - larger and more visible */}
+                        {/* Star icon for save/unsave - optimized interactions */}
                         <div 
-                          className="flex-shrink-0 p-1 rounded hover:bg-accent/50 transition-colors"
+                          className="flex-shrink-0 p-1 rounded hover:bg-accent/30 transition-colors duration-75 active:scale-95"
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
+                            
+                            // Immediate visual feedback
+                            const target = e.currentTarget;
+                            target.style.transform = 'scale(0.9)';
+                            setTimeout(() => {
+                              target.style.transform = '';
+                            }, 100);
+                            
                             if (isInStarCategory && animation.isSaved) {
                               // In star category, clicking star on saved animation removes it
                               toggleSaveAnimation(animation);
@@ -1020,7 +1042,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                           {animation.isDefault ? (
                             <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                           ) : (
-                            <Star className={`h-4 w-4 transition-colors ${
+                            <Star className={`h-4 w-4 transition-colors duration-75 ${
                               isSaved 
                                 ? 'text-yellow-500 fill-yellow-500 hover:text-yellow-600'
                                 : 'text-gray-400 hover:text-yellow-500'
@@ -1029,55 +1051,65 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
                         </div>
                       </div>
                       
-                      {/* Active overlay */}
+                      {/* Active overlay with faster transition */}
                       {isApplied && (
-                        <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
+                        <div className="absolute inset-0 bg-primary/3 pointer-events-none" />
                       )}
                     </div>
                   );
                 })}
                 
-                {/* No animation option */}
+                {/* No animation option - optimized */}
                 <div
                   className={`
-                    relative bg-card border rounded-lg overflow-hidden cursor-pointer transition-all duration-200 group
+                    relative bg-card border rounded-lg overflow-hidden cursor-pointer transition-all duration-75 group select-none
                     ${
                       !element.animation 
-                        ? "border-primary ring-2 ring-primary/20 bg-primary/5" 
-                        : "border-border hover:border-accent-foreground hover:bg-accent/50"
+                        ? "border-primary ring-1 ring-primary/20 bg-primary/5" 
+                        : "border-border hover:border-accent-foreground hover:bg-accent/30"
                     }
                   `}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Immediate visual feedback
+                    const target = e.currentTarget;
+                    target.style.transform = 'scale(0.98)';
+                    setTimeout(() => {
+                      target.style.transform = '';
+                    }, 100);
+                    
                     updateTextElement(track.id, element.id, {
                       animation: undefined
                     });
                     toast.success('Removed all animations');
                   }}
                 >
-                  {/* Preview area */}
-                  <div className="h-20 bg-gradient-to-br from-muted/30 to-muted/60 flex items-center justify-center relative">
-                    <div className="text-2xl text-muted-foreground">
+                  {/* Preview area - optimized */}
+                  <div className="h-12 bg-gradient-to-br from-muted/20 to-muted/40 flex items-center justify-center relative active:scale-[0.98] transition-transform duration-75">
+                    <div className="text-xl text-muted-foreground">
                       ⊘
                     </div>
                     {!element.animation && (
-                      <div className="absolute top-1.5 right-1.5">
-                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                      <div className="absolute top-1 right-1">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full" />
                       </div>
                     )}
                   </div>
                   
-                  {/* Label */}
-                  <div className="p-2 text-center">
-                    <div className={`text-xs font-medium ${
+                  {/* Label - optimized */}
+                  <div className="px-1 py-1 text-center">
+                    <div className={`text-[10px] font-medium transition-colors duration-75 ${
                       !element.animation ? 'text-primary' : 'text-foreground'
                     }`}>
                       None
                     </div>
                   </div>
                   
-                  {/* Active overlay */}
+                  {/* Active overlay - faster transition */}
                   {!element.animation && (
-                    <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
+                    <div className="absolute inset-0 bg-primary/3 pointer-events-none" />
                   )}
                 </div>
               </div>

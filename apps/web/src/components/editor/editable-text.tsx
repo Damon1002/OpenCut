@@ -208,15 +208,19 @@ export function EditableText({
     
     setIsResizingWidth(true);
     
-    // Calculate initial width - always get the current rendered text width
+    // Calculate initial width baseline
     const textRect = gsapRef.current?.getBoundingClientRect();
+    const currentRenderedWidth = textRect?.width || 300;
     let initialWidthPx = element.maxWidth;
     
-    // If no maxWidth is set, we need to establish a baseline
+    // For proper width expansion, we need a baseline that allows bidirectional adjustment
     if (!initialWidthPx) {
-      // Use current rendered width as the starting point
-      initialWidthPx = textRect ? Math.max(textRect.width, 200) : 300;
-      // Don't set maxWidth immediately - let the user drag to set it
+      // For unwrapped text, use a conservative baseline to allow expansion
+      initialWidthPx = Math.max(Math.floor(currentRenderedWidth * 0.7), 150);
+    } else {
+      // For wrapped text, use 70% of current maxWidth as baseline
+      // This allows both expansion (right drag) and further contraction (left drag)
+      initialWidthPx = Math.floor(initialWidthPx * 0.7);
     }
     
     setInitialWidth(initialWidthPx);
@@ -281,7 +285,14 @@ export function EditableText({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Enter creates new line (Shift+Enter also creates new line)
+    if (e.key === 'Enter') {
+      // Allow default behavior for Enter to create new lines
+      // Do NOT prevent default
+      return;
+    }
+    // Ctrl/Cmd + Enter saves and exits
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleTextSave();
     }
@@ -290,14 +301,101 @@ export function EditableText({
       setIsEditing(false);
     }
   };
-
-  // Focus textarea when editing starts
+  // Auto-resize textarea and copy styles from display element when editing starts
   useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.focus();
-      textareaRef.current.select();
+    if (isEditing && textareaRef.current && gsapRef.current) {
+      const textarea = textareaRef.current;
+      const displayElement = gsapRef.current;
+
+      // Wait for next frame to ensure textarea is rendered
+      requestAnimationFrame(() => {
+        // Apply styles to textarea first
+        const computedStyles = window.getComputedStyle(displayElement);
+        const textStyle = {
+          fontSize: computedStyles.fontSize,
+          fontFamily: computedStyles.fontFamily,
+          fontWeight: computedStyles.fontWeight,
+          fontStyle: computedStyles.fontStyle,
+          lineHeight: computedStyles.lineHeight,
+          letterSpacing: computedStyles.letterSpacing,
+          textAlign: computedStyles.textAlign,
+          padding: computedStyles.padding,
+          width: computedStyles.width,
+          maxWidth: computedStyles.maxWidth,
+          wordWrap: computedStyles.wordWrap,
+          whiteSpace: computedStyles.whiteSpace,
+          boxSizing: 'border-box' as const,
+        };
+
+        Object.assign(textarea.style, textStyle);
+
+        // Wait for font loading before measuring
+        document.fonts.ready.then(() => {
+          // Create a temporary div for accurate measurement with all constraints
+          const measureDiv = document.createElement('div');
+          Object.assign(measureDiv.style, textStyle, {
+            position: 'absolute',
+            top: '-9999px',
+            left: '-9999px',
+            visibility: 'hidden',
+            height: 'auto',
+            minHeight: '0px',
+            overflow: 'visible',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+          });
+
+          measureDiv.textContent = textarea.value || ' '; // Ensure at least one character for measurement
+          document.body.appendChild(measureDiv);
+
+          // Force layout and measure
+          measureDiv.offsetHeight; // Trigger layout
+          const contentHeight = measureDiv.scrollHeight;
+          
+          document.body.removeChild(measureDiv);
+          
+          // Set textarea height with buffer and ensure minimum height
+          const minHeight = 40;
+          const finalHeight = Math.max(contentHeight + 10, minHeight); // Increased buffer
+          textarea.style.height = `${finalHeight}px`;
+          textarea.style.minHeight = `${finalHeight}px`;
+
+          // Focus and set cursor position
+          textarea.focus();
+          textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+          
+          console.log('📏 Textarea height calculation:', {
+            originalContent: element.content,
+            textareaValue: textarea.value,
+            contentHeight,
+            finalHeight,
+            displayElementHeight: displayElement.offsetHeight
+          });
+        });
+      });
     }
-  }, [isEditing]);
+  }, [isEditing]); // Remove editContent from dependencies to prevent re-calculation during typing
+  
+  // Auto-resize textarea on content change while maintaining display consistency
+  const handleTextChangeWithResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditContent(e.target.value);
+    
+    // Auto-resize to fit content while maintaining minimum height from display element
+    const textarea = e.target;
+    const displayElement = gsapRef.current;
+    const minHeight = displayElement ? parseInt(window.getComputedStyle(displayElement).height) : 40;
+    
+    // Reset height to auto to get accurate scrollHeight
+    textarea.style.height = 'auto';
+    
+    // Force reflow
+    textarea.offsetHeight;
+    
+    // Set height to accommodate all content
+    const contentHeight = textarea.scrollHeight;
+    const requiredHeight = Math.max(contentHeight, minHeight, 40);
+    textarea.style.height = `${requiredHeight}px`;
+  };
 
   // GSAP animation functions with improved smoothness
   const playAnimation = useCallback((animation: string) => {
@@ -811,25 +909,40 @@ export function EditableText({
             <textarea
               ref={textareaRef}
               value={editContent}
-              onChange={handleTextChange}
+              onChange={handleTextChangeWithResize}
               onKeyDown={handleKeyDown}
               onBlur={handleTextSave}
               className={cn(
-                "bg-black/80 text-white border-2 border-blue-500 rounded-md px-2 py-1 resize-none overflow-hidden",
+                "bg-transparent border-none resize-none",
                 fontClassName
               )}
               style={{
+                // Base styling - these will be overridden by computed styles in useEffect
                 fontSize: `${element.fontSize}px`,
+                color: element.color,
+                backgroundColor: element.backgroundColor || 'transparent',
+                textAlign: element.textAlign,
                 fontWeight: element.fontWeight,
                 fontStyle: element.fontStyle,
                 textDecoration: element.textDecoration,
-                textAlign: element.textAlign,
-                minWidth: '100px',
+                textShadow: element.textShadow,
+                letterSpacing: element.letterSpacing ? `${element.letterSpacing}px` : undefined,
+                lineHeight: element.lineHeight || undefined,
+                WebkitTextStroke: element.textStroke ? `${element.textStroke.width}px ${element.textStroke.color}` : undefined,
+                padding: "4px 8px",
+                borderRadius: "2px",
+                whiteSpace: element.maxWidth ? "normal" : "nowrap",
+                wordWrap: element.maxWidth ? "break-word" : "normal",
                 maxWidth: element.maxWidth ? `${element.maxWidth}px` : undefined,
                 width: element.maxWidth ? `${element.maxWidth}px` : 'auto',
                 fontFamily: fontClassName === "" ? element.fontFamily : undefined,
+                outline: 'none',
+                border: 'none',
+                margin: '0',
+                boxSizing: 'border-box',
+                caretColor: element.color === '#ffffff' || element.color === 'white' ? '#000000' : 
+                           element.color === '#000000' || element.color === 'black' ? '#ffffff' : element.color,
               }}
-              rows={element.maxWidth ? undefined : 1}
               autoFocus
             />
           </motion.div>
