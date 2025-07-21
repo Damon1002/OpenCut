@@ -11,6 +11,7 @@ import {
   PropertyItemValue,
 } from "./property-item";
 import { AITextProperties } from "./ai-text-properties";
+import { TextStylePresets } from "../text-style-presets";
 import { gsap } from "gsap";
 import { useRef, useCallback, useEffect, useState } from "react";
 
@@ -97,6 +98,14 @@ export function TextProperties({
           />
         </PropertyItemValue>
       </PropertyItem>
+      
+      {/* Text Style Presets */}
+      <div className="border-t pt-6">
+        <TextStylePresets
+          element={element}
+          track={track}
+        />
+      </div>
       
       {/* AI Text Editor */}
       <div className="border-t pt-6">

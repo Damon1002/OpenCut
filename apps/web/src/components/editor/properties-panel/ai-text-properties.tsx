@@ -548,6 +548,153 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
         }
       },
     },
+    {
+      name: "Orange Highlight",
+      style: {
+        fontSize: 42,
+        fontWeight: "bold",
+        color: "#ffffff",
+        textShadow: "0 0 10px #ff7f00",
+        backgroundColor: "#ff7f00",
+      },
+    },
+    {
+      name: "Sky Blue",
+      style: {
+        fontSize: 42,
+        fontWeight: "600",
+        color: "#ffffff",
+        textShadow: "0 0 10px #1e90ff",
+        backgroundColor: "#1e90ff",
+      },
+    },
+    {
+      name: "Elegant Gray",
+      style: {
+        fontSize: 40,
+        fontWeight: "300",
+        color: "#333333",
+        backgroundColor: "#f0f0f0",
+      },
+    },
+    {
+      name: "Bright Yellow",
+      style: {
+        fontSize: 44,
+        fontWeight: "bold",
+        color: "#000000",
+        textShadow: "2px 2px 4px rgba(255, 215, 0, 0.8)",
+        backgroundColor: "#ffd700",
+      },
+    },
+    {
+      name: "Vibrant Purple",
+      style: {
+        fontSize: 46,
+        fontWeight: "600",
+        color: "#ffffff",
+        textShadow: "0 0 10px #8a2be2",
+        backgroundColor: "#8a2be2",
+      },
+    },
+    {
+      name: "Red Alert",
+      style: {
+        fontSize: 48,
+        fontWeight: "bold",
+        color: "#ffffff",
+        textShadow: "0 0 15px #dc143c",
+        backgroundColor: "#dc143c",
+      },
+    },
+    {
+      name: "Mint Fresh",
+      style: {
+        fontSize: 40,
+        fontWeight: "500",
+        color: "#ffffff",
+        textShadow: "1px 1px 3px rgba(0, 0, 0, 0.5)",
+        backgroundColor: "#00fa9a",
+      },
+    },
+    {
+      name: "Sunset Orange",
+      style: {
+        fontSize: 42,
+        fontWeight: "bold",
+        color: "#ffffff",
+        textShadow: "0 0 12px #ff4500",
+        canvasBackground: {
+          type: 'color',
+          value: '#ff6347'
+        }
+      },
+    },
+    {
+      name: "Ocean Blue",
+      style: {
+        fontSize: 44,
+        fontWeight: "600",
+        color: "#ffffff",
+        textShadow: "2px 2px 6px rgba(0, 0, 0, 0.7)",
+        canvasBackground: {
+          type: 'color',
+          value: '#4682b4'
+        }
+      },
+    },
+    {
+      name: "Forest Green",
+      style: {
+        fontSize: 40,
+        fontWeight: "500",
+        color: "#ffffff",
+        textShadow: "1px 1px 4px rgba(0, 0, 0, 0.6)",
+        canvasBackground: {
+          type: 'color',
+          value: '#228b22'
+        }
+      },
+    },
+    {
+      name: "Royal Gold",
+      style: {
+        fontSize: 50,
+        fontWeight: "bold",
+        color: "#ffd700",
+        textShadow: "2px 2px 8px rgba(0, 0, 0, 0.8), 0 0 20px #ffd700",
+        canvasBackground: {
+          type: 'color',
+          value: '#000000'
+        }
+      },
+    },
+    {
+      name: "Neon Pink",
+      style: {
+        fontSize: 46,
+        fontWeight: "bold",
+        color: "#ff1493",
+        textShadow: "0 0 20px #ff1493, 0 0 40px #ff1493",
+        canvasBackground: {
+          type: 'color',
+          value: '#000000'
+        }
+      },
+    },
+    {
+      name: "Electric Blue",
+      style: {
+        fontSize: 48,
+        fontWeight: "bold",
+        color: "#00bfff",
+        textShadow: "0 0 15px #00bfff, 0 0 30px #00bfff",
+        canvasBackground: {
+          type: 'color',
+          value: '#000080'
+        }
+      },
+    },
   ];
 
   // Get appropriate easing for each animation type like CapCut/剪映
