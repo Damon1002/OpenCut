@@ -33,7 +33,7 @@ export default function RootLayout({
           <TooltipProvider>
             <StorageProvider>{children}</StorageProvider>
             <Analytics />
-            <Toaster />
+            {/* <Toaster /> */}
             <Script
               src="https://cdn.databuddy.cc/databuddy.js"
               strategy="afterInteractive"

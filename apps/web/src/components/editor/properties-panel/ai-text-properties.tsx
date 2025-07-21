@@ -857,13 +857,7 @@ Make sure all color values are valid hex codes, fontSize is a number, and all ot
 
         <TabsContent value="animation" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Text Animations</CardTitle>
-              <CardDescription className="text-xs">
-                Choose animations for your text like CapCut
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
               {/* CapCut-style Category tabs */}
               <div className="flex gap-1 mb-4">
                 {/* Star category - default and saved animations */}

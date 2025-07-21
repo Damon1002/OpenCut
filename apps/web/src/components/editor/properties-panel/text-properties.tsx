@@ -12,7 +12,7 @@ import {
 } from "./property-item";
 import { AITextProperties } from "./ai-text-properties";
 import { gsap } from "gsap";
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
 
 export function TextProperties({
   element,
@@ -23,9 +23,36 @@ export function TextProperties({
 }) {
   const { updateTextElement, tracks } = useTimelineStore();
   const gsapRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [textValue, setTextValue] = useState(element.content);
 
   // Find the track for this element
   const track = tracks.find((t) => t.id === trackId);
+
+  // Auto-resize textarea function
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    // Reset height to get accurate scrollHeight
+    textarea.style.height = 'auto';
+    
+    // Calculate the required height based on content
+    const scrollHeight = textarea.scrollHeight;
+    const minHeight = 72; // min-h-[4.5rem] = 72px
+    const maxHeight = 300; // Maximum height before scrolling
+    
+    // Set the height, respecting min and max constraints
+    const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
+    textarea.style.height = `${newHeight}px`;
+  }, []);
+
+  // Adjust height when element content changes
+  useEffect(() => {
+    setTextValue(element.content);
+    // Adjust height after content update
+    setTimeout(adjustTextareaHeight, 0);
+  }, [element.content, adjustTextareaHeight]);
 
   // Animation trigger function
   const playAnimation = useCallback((animation: string) => {
@@ -46,12 +73,18 @@ export function TextProperties({
   return (
     <div className="space-y-6 p-5">
       <Textarea
-        placeholder="Name"
-        defaultValue={element.content}
-        className="min-h-[4.5rem] resize-none bg-background/50"
-        onChange={(e) =>
-          updateTextElement(trackId, element.id, { content: e.target.value })
-        }
+        ref={textareaRef}
+        placeholder="Enter your text here..."
+        value={textValue}
+        className="min-h-[4.5rem] max-h-[18.75rem] resize-none bg-background/50 overflow-y-auto"
+        onChange={(e) => {
+          const newValue = e.target.value;
+          setTextValue(newValue);
+          updateTextElement(trackId, element.id, { content: newValue });
+          // Adjust height after content change
+          setTimeout(adjustTextareaHeight, 0);
+        }}
+        onInput={adjustTextareaHeight}
       />
       <PropertyItem direction="row">
         <PropertyItemLabel>Font</PropertyItemLabel>

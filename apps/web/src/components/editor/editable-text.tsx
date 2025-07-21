@@ -8,6 +8,7 @@ import { useTimelineStore } from "@/stores/timeline-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { FONT_CLASS_MAP } from "@/lib/font-config";
 import { cn } from "@/lib/utils";
+import { TextAlignmentToolbar } from "./text-alignment-toolbar";
 
 interface EditableTextProps {
   element: TextElement;
@@ -43,6 +44,8 @@ export function EditableText({
   const [initialRotation, setInitialRotation] = useState(element.rotation);
   const [isResizingWidth, setIsResizingWidth] = useState(false);
   const [initialWidth, setInitialWidth] = useState(element.maxWidth || 'auto');
+  const [showAlignmentToolbar, setShowAlignmentToolbar] = useState(false);
+  const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 });
   
   const elementRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -125,6 +128,16 @@ export function EditableText({
         // Select this text element in the timeline and show controls
         selectElement(track.id, element.id, false);
         setIsSelected(true);
+        
+        // Position alignment toolbar at the bottom center of the canvas
+        const currentPreviewRef = externalPreviewRef || previewRef;
+        if (currentPreviewRef?.current) {
+          const canvasRect = currentPreviewRef.current.getBoundingClientRect();
+          const centerX = canvasRect.left + canvasRect.width / 2;
+          const bottomY = canvasRect.bottom - 15; // 15px from bottom of canvas
+          setToolbarPosition({ x: centerX, y: bottomY });
+          setShowAlignmentToolbar(true);
+        }
       }
     }
     
@@ -208,25 +221,13 @@ export function EditableText({
     
     setIsResizingWidth(true);
     
-    // Calculate initial width baseline
+    // Get the current actual rendered width of the text
     const textRect = gsapRef.current?.getBoundingClientRect();
     const currentRenderedWidth = textRect?.width || 300;
-    let initialWidthPx = element.maxWidth;
     
-    // For proper width expansion, we need a baseline that allows bidirectional adjustment
-    if (!initialWidthPx) {
-      // For unwrapped text, use a conservative baseline to allow expansion
-      initialWidthPx = Math.max(Math.floor(currentRenderedWidth * 0.7), 150);
-    } else {
-      // For wrapped text, use 70% of current maxWidth as baseline
-      // This allows both expansion (right drag) and further contraction (left drag)
-      initialWidthPx = Math.floor(initialWidthPx * 0.7);
-    }
-    
+    // Use current maxWidth or rendered width as starting point
+    const initialWidthPx = element.maxWidth || currentRenderedWidth;
     setInitialWidth(initialWidthPx);
-    
-    const elementRect = elementRef.current?.getBoundingClientRect();
-    if (!elementRect) return;
     
     const startX = e.clientX;
     
@@ -235,13 +236,15 @@ export function EditableText({
       let newWidth: number;
       
       if (side === 'right') {
+        // Right drag: expand width (no upper limit for CapCut-like behavior)
         newWidth = initialWidthPx + deltaX;
       } else {
+        // Left drag: contract width
         newWidth = initialWidthPx - deltaX;
       }
       
-      // Clamp width between 50px and 800px
-      newWidth = Math.max(50, Math.min(800, newWidth));
+      // Only set minimum width limit (no maximum for unlimited expansion)
+      newWidth = Math.max(50, newWidth);
       
       // Always set maxWidth when dragging (this enables text wrapping)
       updateTextElement(track.id, element.id, { maxWidth: newWidth });
@@ -257,11 +260,18 @@ export function EditableText({
     document.addEventListener('mouseup', handleMouseUp);
   }, [element.maxWidth, track.id, element.id, updateTextElement]);
 
-  // Click outside to deselect
+  // Click outside to deselect and hide toolbar when not selected
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (elementRef.current && !elementRef.current.contains(e.target as Node)) {
-        setIsSelected(false);
+        // Check if the click was on the alignment toolbar
+        const target = e.target as Element;
+        const isToolbarClick = target.closest('[data-alignment-toolbar]');
+        
+        if (!isToolbarClick) {
+          setIsSelected(false);
+          setShowAlignmentToolbar(false);
+        }
       }
     };
     
@@ -273,6 +283,13 @@ export function EditableText({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isSelected]);
+  
+  // Hide alignment toolbar when element is deselected
+  useEffect(() => {
+    if (!isSelected) {
+      setShowAlignmentToolbar(false);
+    }
+  }, [isSelected]);
 
   // Handle text editing
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -282,6 +299,16 @@ export function EditableText({
   const handleTextSave = () => {
     updateTextElement(track.id, element.id, { content: editContent });
     setIsEditing(false);
+  };
+
+  // Handle alignment change
+  const handleAlignmentChange = (alignment: "left" | "center" | "right") => {
+    updateTextElement(track.id, element.id, { textAlign: alignment });
+  };
+
+  // Handle toolbar position change
+  const handleToolbarPositionChange = (newPosition: { x: number; y: number }) => {
+    setToolbarPosition(newPosition);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -965,11 +992,13 @@ export function EditableText({
                 WebkitTextStroke: element.textStroke ? `${element.textStroke.width}px ${element.textStroke.color}` : undefined,
                 padding: "4px 8px",
                 borderRadius: "2px",
-                whiteSpace: element.maxWidth ? "normal" : "nowrap",
+                whiteSpace: element.maxWidth ? "pre-wrap" : "nowrap", // Use pre-wrap to preserve line breaks
                 wordWrap: element.maxWidth ? "break-word" : "normal",
                 maxWidth: element.maxWidth ? `${element.maxWidth}px` : undefined,
                 width: element.maxWidth ? `${element.maxWidth}px` : "auto",
                 fontFamily: fontClassName === "" ? element.fontFamily : undefined,
+                overflow: "visible", // Ensure text doesn't get clipped
+                minHeight: "auto", // Allow natural height
               }}
               onMouseEnter={() => {
                 console.log('🔍 Text element debug info:');
@@ -1003,13 +1032,13 @@ export function EditableText({
                   {/* Selection border - White border like CapCut */}
                   <div className="absolute inset-0 border-2 border-white rounded-md pointer-events-none shadow-lg" />
                   
-                  {/* Width adjustment handles */}
-                  <div className="absolute -left-3 top-1/2 -translate-y-1/2 group/width-left pointer-events-auto">
+                  {/* Width adjustment handles - Made larger */}
+                  <div className="absolute -left-8 top-1/2 -translate-y-1/2 group/width-left pointer-events-auto">
                     <div
-                      className="w-6 h-6 bg-orange-500 border-2 border-white rounded-full cursor-ew-resize hover:bg-orange-600 transition-colors flex items-center justify-center shadow-lg"
+                      className="w-16 h-16 bg-orange-500 border-2 border-white rounded-full cursor-ew-resize hover:bg-orange-600 transition-colors flex items-center justify-center shadow-lg"
                       onMouseDown={(e) => handleWidthMouseDown(e, 'left')}
                     >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-white">
+                      <svg width="28" height="28" viewBox="0 0 12 12" fill="none" className="text-white">
                         <path d="M4 6H8M4 6L6 4M4 6L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
@@ -1020,12 +1049,12 @@ export function EditableText({
                     </div>
                   </div>
                   
-                  <div className="absolute -right-3 top-1/2 -translate-y-1/2 group/width-right pointer-events-auto">
+                  <div className="absolute -right-8 top-1/2 -translate-y-1/2 group/width-right pointer-events-auto">
                     <div
-                      className="w-6 h-6 bg-orange-500 border-2 border-white rounded-full cursor-ew-resize hover:bg-orange-600 transition-colors flex items-center justify-center shadow-lg"
+                      className="w-16 h-16 bg-orange-500 border-2 border-white rounded-full cursor-ew-resize hover:bg-orange-600 transition-colors flex items-center justify-center shadow-lg"
                       onMouseDown={(e) => handleWidthMouseDown(e, 'right')}
                     >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-white">
+                      <svg width="28" height="28" viewBox="0 0 12 12" fill="none" className="text-white">
                         <path d="M8 6H4M8 6L6 4M8 6L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
@@ -1036,13 +1065,13 @@ export function EditableText({
                     </div>
                   </div>
                   
-                  {/* Font size handle (bottom-right) with larger tooltip */}
-                  <div className="absolute -bottom-3 -right-3 group/resize pointer-events-auto">
+                  {/* Font size handle (bottom-right) - Made larger */}
+                  <div className="absolute -bottom-4 -right-4 group/resize pointer-events-auto">
                     <div
-                      className="w-8 h-8 bg-blue-500 border-2 border-white rounded-full cursor-move hover:bg-blue-600 transition-colors flex items-center justify-center shadow-lg"
+                      className="w-10 h-10 bg-blue-500 border-2 border-white rounded-full cursor-move hover:bg-blue-600 transition-colors flex items-center justify-center shadow-lg"
                       onMouseDown={handleFontSizeMouseDown}
                     >
-                      <svg width="14" height="14" viewBox="0 0 12 12" fill="none" className="text-white">
+                      <svg width="16" height="16" viewBox="0 0 12 12" fill="none" className="text-white">
                         <path d="M3 9V3h6v6M3 3l6 6M9 3v6M3 9h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
@@ -1053,13 +1082,13 @@ export function EditableText({
                     </div>
                   </div>
                   
-                  {/* Rotation handle (top-right) with larger tooltip */}
-                  <div className="absolute -top-10 right-0 group/rotate pointer-events-auto">
+                  {/* Rotation handle (top-right) - Made larger */}
+                  <div className="absolute -top-12 right-0 group/rotate pointer-events-auto">
                     <div
-                      className="w-8 h-8 bg-green-500 border-2 border-white rounded-full cursor-crosshair hover:bg-green-600 transition-colors flex items-center justify-center shadow-lg"
+                      className="w-10 h-10 bg-green-500 border-2 border-white rounded-full cursor-crosshair hover:bg-green-600 transition-colors flex items-center justify-center shadow-lg"
                       onMouseDown={handleRotationMouseDown}
                     >
-                      <svg width="14" height="14" viewBox="0 0 12 12" fill="none" className="text-white">
+                      <svg width="16" height="16" viewBox="0 0 12 12" fill="none" className="text-white">
                         <path d="M10 6a4 4 0 1 1-4-4V1l2 2-2 2V4a2 2 0 1 0 2 2h1z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
@@ -1079,6 +1108,20 @@ export function EditableText({
             </AnimatePresence>
           </div>
         )}
+        
+        {/* Text Alignment Toolbar */}
+        <AnimatePresence>
+          {showAlignmentToolbar && isSelected && (
+            <div data-alignment-toolbar>
+              <TextAlignmentToolbar
+                currentAlignment={element.textAlign}
+                onAlignmentChange={handleAlignmentChange}
+                position={toolbarPosition}
+                onPositionChange={handleToolbarPositionChange}
+              />
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     </>
   );

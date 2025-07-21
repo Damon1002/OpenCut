@@ -640,13 +640,7 @@ Example: Neon Glow|color=#ff00ff|textShadow=0 0 25px #ff00ff`;
 
             <TabsContent value="animation" className="space-y-6">
               <Card>
-                <CardHeader>
-                  <CardTitle>Text Animations</CardTitle>
-                  <CardDescription>
-                    Apply entrance animations to your selected text element using GSAP
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="pt-4">
                   <div className="grid gap-4">
                     {ANIMATION_PRESETS.map((animation) => (
                       <div
