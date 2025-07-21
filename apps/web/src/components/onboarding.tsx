@@ -18,9 +18,9 @@ export function Onboarding({ isOpen, onClose }: OnboardingProps) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Welcome to Clipture</DialogTitle>
+          <DialogTitle>Welcome to OpenCut Alpha</DialogTitle>
           <DialogDescription>
-            Let's get you started with the basics.
+            You're among the first to try our early alpha version. Let's get you started!
           </DialogDescription>
         </DialogHeader>
       </DialogContent>

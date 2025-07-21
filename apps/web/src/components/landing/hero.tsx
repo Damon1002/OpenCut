@@ -175,7 +175,7 @@ export function Hero() {
               disabled={isSubmitting || !csrfToken}
             >
               <span className="relative z-10">
-                {isSubmitting ? "Joining..." : "Join waitlist"}
+                {isSubmitting ? "Joining..." : "Try early alpha"}
               </span>
               <ArrowRight className="relative z-10 ml-0.5 h-4 w-4 inline-block" />
             </Button>
