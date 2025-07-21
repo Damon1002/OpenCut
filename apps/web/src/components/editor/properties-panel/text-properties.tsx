@@ -40,7 +40,7 @@ export function TextProperties({
     // Calculate the required height based on content
     const scrollHeight = textarea.scrollHeight;
     const minHeight = 72; // min-h-[4.5rem] = 72px
-    const maxHeight = 300; // Maximum height before scrolling
+    const maxHeight = 600; // Maximum height before scrolling
     
     // Set the height, respecting min and max constraints
     const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
@@ -76,7 +76,7 @@ export function TextProperties({
         ref={textareaRef}
         placeholder="Enter your text here..."
         value={textValue}
-        className="min-h-[4.5rem] max-h-[18.75rem] resize-none bg-background/50 overflow-y-auto"
+        className="min-h-[4.5rem] max-h-[37.5rem] resize-none bg-background/50 overflow-y-auto"
         onChange={(e) => {
           const newValue = e.target.value;
           setTextValue(newValue);

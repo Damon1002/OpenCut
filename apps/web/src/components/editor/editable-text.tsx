@@ -328,100 +328,38 @@ export function EditableText({
       setIsEditing(false);
     }
   };
-  // Auto-resize textarea and copy styles from display element when editing starts
+  // Simple forced height setup for textarea when editing starts
   useEffect(() => {
-    if (isEditing && textareaRef.current && gsapRef.current) {
+    if (isEditing && textareaRef.current) {
       const textarea = textareaRef.current;
-      const displayElement = gsapRef.current;
-
+      
       // Wait for next frame to ensure textarea is rendered
       requestAnimationFrame(() => {
-        // Apply styles to textarea first
-        const computedStyles = window.getComputedStyle(displayElement);
-        const textStyle = {
-          fontSize: computedStyles.fontSize,
-          fontFamily: computedStyles.fontFamily,
-          fontWeight: computedStyles.fontWeight,
-          fontStyle: computedStyles.fontStyle,
-          lineHeight: computedStyles.lineHeight,
-          letterSpacing: computedStyles.letterSpacing,
-          textAlign: computedStyles.textAlign,
-          padding: computedStyles.padding,
-          width: computedStyles.width,
-          maxWidth: computedStyles.maxWidth,
-          wordWrap: computedStyles.wordWrap,
-          whiteSpace: computedStyles.whiteSpace,
-          boxSizing: 'border-box' as const,
-        };
-
-        Object.assign(textarea.style, textStyle);
-
-        // Wait for font loading before measuring
-        document.fonts.ready.then(() => {
-          // Create a temporary div for accurate measurement with all constraints
-          const measureDiv = document.createElement('div');
-          Object.assign(measureDiv.style, textStyle, {
-            position: 'absolute',
-            top: '-9999px',
-            left: '-9999px',
-            visibility: 'hidden',
-            height: 'auto',
-            minHeight: '0px',
-            overflow: 'visible',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-          });
-
-          measureDiv.textContent = textarea.value || ' '; // Ensure at least one character for measurement
-          document.body.appendChild(measureDiv);
-
-          // Force layout and measure
-          measureDiv.offsetHeight; // Trigger layout
-          const contentHeight = measureDiv.scrollHeight;
-          
-          document.body.removeChild(measureDiv);
-          
-          // Set textarea height with buffer and ensure minimum height
-          const minHeight = 40;
-          const finalHeight = Math.max(contentHeight + 10, minHeight); // Increased buffer
-          textarea.style.height = `${finalHeight}px`;
-          textarea.style.minHeight = `${finalHeight}px`;
-
-          // Focus and set cursor position
-          textarea.focus();
-          textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-          
-          console.log('📏 Textarea height calculation:', {
-            originalContent: element.content,
-            textareaValue: textarea.value,
-            contentHeight,
-            finalHeight,
-            displayElementHeight: displayElement.offsetHeight
-          });
-        });
+        // Force large height directly
+        textarea.style.height = '500px';
+        textarea.style.minHeight = '500px';
+        textarea.style.maxHeight = '800px';
+        textarea.style.overflowY = 'auto';
+        
+        // Focus and set cursor position
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        
+        console.log('📏 Forced textarea height to 500px');
       });
     }
-  }, [isEditing]); // Remove editContent from dependencies to prevent re-calculation during typing
+  }, [isEditing])
   
-  // Auto-resize textarea on content change while maintaining display consistency
+  // Simple text change handler without height adjustment
   const handleTextChangeWithResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setEditContent(e.target.value);
     
-    // Auto-resize to fit content while maintaining minimum height from display element
+    // Keep the forced height - don't resize on content change
     const textarea = e.target;
-    const displayElement = gsapRef.current;
-    const minHeight = displayElement ? parseInt(window.getComputedStyle(displayElement).height) : 40;
-    
-    // Reset height to auto to get accurate scrollHeight
-    textarea.style.height = 'auto';
-    
-    // Force reflow
-    textarea.offsetHeight;
-    
-    // Set height to accommodate all content
-    const contentHeight = textarea.scrollHeight;
-    const requiredHeight = Math.max(contentHeight, minHeight, 40);
-    textarea.style.height = `${requiredHeight}px`;
+    textarea.style.height = '500px';
+    textarea.style.minHeight = '500px';
+    textarea.style.maxHeight = '800px';
+    textarea.style.overflowY = 'auto';
   };
 
   // GSAP animation functions with improved smoothness
@@ -911,9 +849,9 @@ export function EditableText({
       <div
         ref={elementRef}
         className={cn(
-          "absolute flex items-center justify-center select-none group",
-          isDragging ? 'cursor-grabbing' : 'cursor-grab',
-          isEditing && 'cursor-text'
+          "absolute flex select-none group",
+          isEditing ? 'items-start justify-start cursor-text' : 'items-center justify-center',
+          isDragging ? 'cursor-grabbing' : 'cursor-grab'
         )}
         style={{
           left: `${50 + (element.x / canvasSize.width) * 100}%`,
@@ -969,6 +907,11 @@ export function EditableText({
                 boxSizing: 'border-box',
                 caretColor: element.color === '#ffffff' || element.color === 'white' ? '#000000' : 
                            element.color === '#000000' || element.color === 'black' ? '#ffffff' : element.color,
+                // Force large height for editing
+                height: '500px !important',
+                minHeight: '500px !important',
+                maxHeight: '800px !important',
+                overflowY: 'auto !important',
               }}
               autoFocus
             />
